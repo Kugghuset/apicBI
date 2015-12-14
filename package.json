@@ -1,0 +1,26 @@
+{
+  "name": "apicBI",
+  "version": "0.0.1",
+  "description": "A communication layer between ICWS and Power BI",
+  "main": "index.js",
+  "dependencies": {
+    "adal-node": "^0.1.17",
+    "node-env-file": "^0.1.8",
+    "request": "^2.67.0"
+  },
+  "devDependencies": {
+    "gulp": "^3.9.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kugghuset/apicBI.git"
+  },
+  "author": "Hannes Dahlberg",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Kugghuset/apicBI/issues"
+  }
+}
