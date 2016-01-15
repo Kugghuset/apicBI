@@ -116,5 +116,5 @@ LEFT JOIN (
 ON [iDetails].[ICUserID] = [avgCView].[UserId]
 
 
--- Only use agents which have been activ TODAY.
+-- Only use agents which have been active TODAY.
 WHERE [ICUserID] IN (SELECT * FROM @ActiveAgents)
