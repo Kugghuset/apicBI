@@ -3,16 +3,15 @@ global.root = __dirname;
 var env = require('node-env-file');
 env(global.root + '/.env');
 
-var Error = require(global.root + '/lib/error.js');
+/*var Error = require(global.root + '/lib/error.js');
 var AzureAuth = require(global.root + '/lib/azureAuth.js');
 var ICWSAuth = require(global.root + '/lib/icwsAuth.js');
-var SqlQuery = require(global.root + '/lib/sqlQuery.js');
-var PowerBi = require(global.root + '/lib/powerBi.js');
+var PowerBi = require(global.root + '/lib/powerBi.js');*/
 
 var DB2BI = require(global.root + '/controllers/db2bi.js');
-var ICWS2BI = require(global.root + '/controllers/icws2Bi.js');
+//var ICWS2BI = require(global.root + '/controllers/icws2Bi.js');
 
-ICWS2BI.readData();
+DB2BI.read();
 
 //DB2BI.copyTables();
 
