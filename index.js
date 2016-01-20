@@ -1,60 +1,85 @@
-global.root = __dirname;
+var https = require('https');
+var crypto = require('crypto');
 
-var env = require('node-env-file');
-env(global.root + '/.env');
+var moment = require('moment');
 
-var Error = require(global.root + '/lib/error.js');
-var AzureAuth = require(global.root + '/lib/azureAuth.js');
-var ICWSAuth = require(global.root + '/lib/icwsAuth.js');
-var SqlQuery = require(global.root + '/lib/sqlQuery.js');
-var PowerBi = require(global.root + '/lib/powerBi.js');
-
-var DB2BI = require(global.root + '/controllers/db2bi.js');
-var ICWS2BI = require(global.root + '/controllers/icws2Bi.js');
-
-ICWS2BI.readData();
-
-//DB2BI.copyTables();
-
-/*var SqlQuery = new SqlQuery('tickety');
-SqlQuery.query('SELECT * FROM [vi_DimTicketCategories]').then(function(recordset) {
-    console.log(recordset);
-}).catch(function(error) {
-    console.log(error);
-});*/
-
-/*var icwsAuth = new ICWSAuth();
-icwsAuth.getToken().then(function(result) {
-    console.log(result);
-}).catch(function(error) {
-    console.log(error);
-});*/
+// Event Hubs parameters
+var namespace = 'tiegoeventhub';
+var hubname ='tiegoeventhub';
+var devicename = 'device-01';
 
 
 
-/*var azure = new AzureAuth();
-azure.getToken()
-.then(function(data) {
-    var powerBi = new PowerBi(data.token);
-    powerBi.AddRows('ApicBI', 'vi_DimTicketCategories', [
+setInterval(function () {
+    
+    // Payload to send
+    var payload = JSON.stringify({
+        "Temperature": Math.round(((Math.random() * 1000) % 30) + ((Math.random() * 1000) / 30), 2),
+        "Humidity":"0.4",
+        TimeStampYo: moment().format('YYYY-MM-DD HH:mm:ss')
+    });
+
+    // Shared access key (from Event Hub configuration)
+    var my_key_name = 'all';
+    var my_key = '1mlUgqAiA1QYvQFhRtnYZqQwwVLlYW88WMnrGpbpBEs=';
+
+    // Full Event Hub publisher URI
+    var my_uri = 'https://' + namespace + '.servicebus.windows.net' + '/' + hubname + '/publishers/' + devicename + '/messages';
+
+    // Create a SAS token
+    // See http://msdn.microsoft.com/library/azure/dn170477.aspx
+
+    function create_sas_token(uri, key_name, key)
     {
-      'CategoryJoin': 'Lasse',
-      'CategoryL1': '1',
-      'CategoryL2': '2',
-      'CategoryL3': '3'
-    },
-    {
-      'CategoryJoin': 'Berg',
-      'CategoryL1': '1',
-      'CategoryL2': '2',
-      'CategoryL3': '3'
+        // Token expires in 24 hours
+        var expiry = Math.floor((new Date()).getTime()/1000+3600*24);
+
+        var string_to_sign = encodeURIComponent(uri) + '\n' + expiry;
+        var hmac = crypto.createHmac('sha256', key);
+        hmac.update(string_to_sign);
+        var signature = hmac.digest('base64');
+        var token = 'SharedAccessSignature sr=' + encodeURIComponent(uri) + '&sig=' + encodeURIComponent(signature) + '&se=' + expiry + '&skn=' + key_name;
+
+        return token;
     }
-  ], false).then(function(data) {
-        if(data.status) {
-            console.log('YES');
-        } else {
-            console.log('NO');
-        }
-    }).catch(function(error) { Error.print('Something went wrong', error); });
-})
-.catch(function(error) { Error.print('Something went wrong', error); });*/
+
+    var my_sas = create_sas_token(my_uri, my_key_name, my_key)
+
+    console.log(my_sas);
+
+    // Send the request to the Event Hub
+
+    var options = {
+    hostname: namespace + '.servicebus.windows.net',
+    port: 443,
+    path: '/' + hubname + '/publishers/' + devicename + '/messages',
+    method: 'POST',
+    headers: {
+        'Authorization': my_sas,
+        'Content-Length': payload.length,
+        'Content-Type': 'application/atom+xml;type=entry;charset=utf-8'
+    }
+    };
+
+    var req = https.request(options, function(res) {
+        
+    console.log()
+    // console.log("statusCode: ", res.statusCode);
+    // console.log("headers: ", res.headers);
+    
+    res.on('data', function(d) {
+        process.stdout.write(d);
+    });
+    });
+
+    req.on('error', function(e) {
+    console.error(e);
+    });
+
+    req.write(payload);
+    req.end();
+
+    
+}, 5000);
+
+

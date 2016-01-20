@@ -2,45 +2,63 @@ module.exports = {
     name: 'ApicBI',
     tables: [
         {
-            name: 'vi_DimCustomers', columns: [
-                { name: 'CustomerNr', dataType: 'Int64' },
-                { name: 'CustomerName', dataType: 'String' },
-                { name: 'CompanyRegistrationNr', dataType: 'String' },
-                { name: 'AcquiringTerminal', dataType: 'String' },
-                { name: 'Partner', dataType: 'String' },
-                { name: 'BusinessArea', dataType: 'String' },
-                { name: 'CustomerSinceDate', dataType: 'DateTime' },
-                { name: 'LicenseCount', dataType: 'Int64' },
-                { name: 'TransactionValueL12M', dataType: 'Double' }
+            name: 'poll_per_agent_call_length_this_week', columns [
+                { name: 'Agent', dataType: 'String' },
+                { name: 'Call duration in seconds' dataType: 'Int64' },
+                { name: 'Waiting time in seconds', dataType: 'Int64' },
+                { name: 'Is under 60', dataType: 'Int64' }
+            ]
+        }
+        {
+            name: 'day_per_agent', columns: [
+                { name: 'Agent', dataType: 'String' },
+                { name: 'Total calls today', dataType: 'Int64' },
+                { name: 'Total calls this week', dataType: 'Int64' },
+                { name: 'Average calls by now', dataType: 'Int64' },
+                { name: 'Average call duration today', dataType: 'Int64' },
+                { name: 'Pretty average call duration today', dataType: 'String' },
+                { name: 'Average call duration this week', dataType: 'Int64' },
+                { name: 'Pretty average call duration this week', dataType: 'String' },
+                { name: 'Average call duration by now', dataType: 'Int64' },
+                { name: 'Pretty average call duration by now', dataType: 'String' }
             ]
         },
         {
-            name: 'vi_DimTicketCategories', columns: [
-                { name: 'CategoryJoin', dataType: 'String' },
-                { name: 'CategoryL1', dataType: 'String' },
-                { name: 'CategoryL2', dataType: 'String' },
-                { name: 'CategoryL3', dataType: 'String' }
+            name: 'week_per_agent', columns: [
+                { name: 'Agent', dataType: 'String' },
+                { name: 'Total calls today', dataType: 'Int64' },
+                { name: 'Total calls this week', dataType: 'Int64' },
+                { name: 'Average calls by now', dataType: 'Int64' },
+                { name: 'Average call duration today', dataType: 'Int64' },
+                { name: 'Pretty average call duration today', dataType: 'String' },
+                { name: 'Average call duration this week', dataType: 'Int64' },
+                { name: 'Pretty average call duration this week', dataType: 'String' },
+                { name: 'Average call duration by now', dataType: 'Int64' },
+                { name: 'Pretty average call duration by now', dataType: 'String' }
             ]
         },
         {
-            name: 'vi_FactTickets', columns: [
-                { name: 'CategoryJoin', dataType: 'String' },
-                { name: 'ticketId', dataType: 'Int64' },
-                { name: 'CustomerContactPerson', dataType: 'String' },
-                { name: 'isReseller', dataType: 'Boolean' },
-                { name: 'summary', dataType: 'String' },
-                { name: 'TransferredToDepartmentName', dataType: 'String' },
-                { name: 'status', dataType: 'String' },
-                { name: 'CountryShort', dataType: 'String' },
-                { name: 'CustomerNumber', dataType: 'String' },
-                { name: 'CustomerName', dataType: 'String' },
-                { name: 'Company Registration Nr', dataType: 'String' },
-                { name: 'CreatedDate', dataType: 'DateTime' },
-                { name: 'ClosedDate', dataType: 'DateTime' },
-                { name: 'DateUpdated', dataType: 'DateTime' },
-                { name: 'DepartmentName', dataType: 'String' },
-                { name: 'ProductName', dataType: 'String' },
-                { name: 'PhoneNumer', dataType: 'String' }
+            name: 'day_aggregated', columns:
+            [
+                { name: 'Max waiting time in seconds', dataType: 'Double' },
+                { name: 'Average waiting time in seconds', dataType: 'Double' },
+                { name: 'Number of calls', dataType: 'Int64' },
+                { name: 'Average call duration in seconds', dataType: 'Int64' },
+                { name: 'Percentage of calls shorter than a minute', dataType: 'Double' },
+                { name: 'Number of calls this week', dataType: 'Int64' },
+                { name: 'Average call duration in seconds this week', dataType: 'Double'}
+            ]
+        },
+        {
+            name: 'week_aggregated', columns:
+            [
+                { name: 'Max waiting time in seconds', dataType: 'Double' },
+                { name: 'Average waiting time in seconds', dataType: 'Double' },
+                { name: 'Number of calls', dataType: 'Int64' },
+                { name: 'Average call duration in seconds', dataType: 'Int64' },
+                { name: 'Percentage of calls shorter than a minute', dataType: 'Double' },
+                { name: 'Number of calls this week', dataType: 'Int64' },
+                { name: 'Average call duration in seconds this week', dataType: 'Double'}
             ]
         }
     ]
