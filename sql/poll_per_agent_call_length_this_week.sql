@@ -1,6 +1,6 @@
 
 -- Will be set in JavaScript
--- DECLARE @LastUpdate DateTime2 = '2016-01-19 16:23'
+-- DECLARE @LastUpdate DateTime2 = '2016-01-18 00:00'
 
 -- Filter variables
 DECLARE @Now DateTime2 = GETDATE()
@@ -56,12 +56,17 @@ WHERE [CallDirection] = 'Inbound'
  * Output per row:
  * [Agent]                                      Name of the agent
  * [Call duration in seconds]                   The call length in seconds
- * [Waiting time in milliseconds]               The waiting time in milliseconds
+ * [Waiting time in seconds]                    The waiting time in seconds
+ * [Is under 60]                                Boolean value for whether the call length is under 60 or not
  * [I3TimeStampGMT]                             The time of insert of the row
 ***************************************************************************/
 SELECT [iDetails].[FirstName] + ' ' + [iDetails].[LastName] AS [Agent]
      , [cView].[CallDurationSeconds] AS [Call duration in seconds]
-     , [cView].[tQueueWait] AS [Waiting time in milliseconds]
+     , [cView].[tQueueWait] / 1000 AS [Waiting time in seconds]
+	 , CASE
+			WHEN [cView].[CallDurationSeconds] < 60 THEN 1
+			ELSE 0
+	   END AS [Is under 60]
      , [cView].[I3TimeStampGMT]
 FROM [SP_I3_IC].[dbo].[IndivDetails] AS [iDetails]
 
