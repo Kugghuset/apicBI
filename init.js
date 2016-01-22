@@ -1,13 +1,11 @@
-global.root = __dirname;
-
 var env = require('node-env-file');
-env(global.root + '/.env');
+env('./.env');
 
 var _ = require('lodash');
 
-var ArgValues = require(global.root + '/lib/argValues.js');
-var AzureAuth = require(global.root + '/lib/azureAuth.js');
-var PowerBi = require(global.root + '/lib/powerBi.js');
+var ArgValues = require('./lib/argValues');
+var AzureAuth = require('./lib/azureAuth');
+var PowerBi = require('./lib/powerBi');
 
 var azure = new AzureAuth();
 

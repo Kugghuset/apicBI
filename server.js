@@ -1,8 +1,6 @@
-global.root = __dirname;
-
 var env = require('node-env-file');
 var later = require('later');
-env(global.root + '/.env');
+env('./.env');
 
 var DB2BI = require('./controllers/db2bi');
 var PowerBI = require('./lib/powerBi');

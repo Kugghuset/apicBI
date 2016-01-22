@@ -1,19 +1,19 @@
 var Promise = require('bluebird');
-var AzureAuth = require(global.root + '/lib/azureAuth.js');
-var PowerBi = require(global.root + '/lib/powerBi.js');
+var AzureAuth = require('../lib/azureAuth');
+var PowerBi = require('../lib/powerBi');
 var sql = require("seriate");
 var fs = require('fs');
 var path = require('path');
 var moment = require('moment');
 var _ = require('lodash');
 
-var database = require(global.root + '/configs/database.js');
+var database = require('../configs/database');
 
 // Init only needed once
 sql.setDefaultConfig(database.ic);
 
 // Filapath to the storage file
-var filePath = path.resolve(global.root, 'assets/lastUpdated.txt');
+var filePath = path.resolve('../assets/lastUpdated.txt');
 
 function DB2BI() {}
 
@@ -26,7 +26,7 @@ DB2BI.read = function() {
         // Set last updated to either the time found in assets/lastUpdate.txt
         // Or to the start of this week if there is none in the file.
         var lastUpdated = fs.existsSync(filePath)
-            ? fs.readFileSync(path.resolve(global.root, 'assets/lastUpdated.txt'), 'utf8')
+            ? fs.readFileSync(filePath, 'utf8')
             : moment().startOf('week').valueOf();
         
         function getQuery() {

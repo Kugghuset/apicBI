@@ -1,7 +1,7 @@
 var Promise = require('bluebird');
-var Error = require(global.root + '/lib/error.js');
-var ICWS = require(global.root + '/lib/icws.js');
-var PowerBi = require(global.root + '/lib/powerBi.js');
+var Error = require('../lib/error');
+var ICWS = require('../lib/icws');
+var PowerBi = require('../lib/powerBi');
 
 var datasetId = '6c11e7ca-b880-46c0-9694-ebd99db00054';
 
