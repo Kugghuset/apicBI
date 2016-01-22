@@ -6,7 +6,9 @@ module.exports = {
                 { name: 'Agent', dataType: 'String' },
                 { name: 'Call duration in seconds', dataType: 'Int64' },
                 { name: 'Waiting time in seconds', dataType: 'Int64' },
-                { name: 'Is under 60', dataType: 'Int64' }
+                { name: 'Is under 60', dataType: 'Int64' },
+                { name: 'Date connected', dataType: 'Datetime' },
+                { name: 'Date disconnected', dataType: 'Datetime' }
             ]
         },
         {
@@ -14,23 +16,9 @@ module.exports = {
                 { name: 'Agent', dataType: 'String' },
                 { name: 'Call duration in seconds', dataType: 'Int64' },
                 { name: 'Waiting time in seconds', dataType: 'Int64' },
-                { name: 'Is under 60', dataType: 'Int64' }
-            ]
-        },
-        {
-            name: 'day_aggregated', columns: [
-                { name: 'Agent', dataType: 'String' },
-                { name: 'Call duration in seconds', dataType: 'Int64' },
-                { name: 'Waiting time in seconds', dataType: 'Int64' },
-                { name: 'Is under 60', dataType: 'Int64' }
-            ]
-        },
-        {
-            name: 'week_aggregated', columns: [
-                { name: 'Agent', dataType: 'String' },
-                { name: 'Call duration in seconds', dataType: 'Int64' },
-                { name: 'Waiting time in seconds', dataType: 'Int64' },
-                { name: 'Is under 60', dataType: 'Int64' }
+                { name: 'Is under 60', dataType: 'Int64' },
+                { name: 'Date connected', dataType: 'Datetime' },
+                { name: 'Date disconnected', dataType: 'Datetime' }
             ]
         }
     ]
