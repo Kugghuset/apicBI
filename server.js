@@ -5,7 +5,8 @@ var later = require('later');
 env(global.root + '/.env');
 
 var DB2BI = require('./controllers/db2bi');
-var PowerBI = require('./lib/powerBi');
+var ClearTable = require('./controllers/clearTable');
+
 
 
 // Schedule which will run every 10 seconds
@@ -29,11 +30,11 @@ later.setInterval(DB2BI.read, every10Seconds);
 // Daily clearing of the daily table
 later.setInterval(function () {
     // Clear the day_per_agent table in ApicBI
-    // INSERT HERE
+    ClearTable.run('daily');
 }, everyStartOfDay);
 
 // Weekly clearing of the weekly table
 later.setInterval(function () {
     // Clear the week_per_agent table in ApicBI
-    // INSERT HERE
+    ClearTable.run('weekly');
 }, everyStartOfWeek);
