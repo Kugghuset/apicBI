@@ -1,5 +1,4 @@
 var Promise = require('bluebird');
-var Error = require(global.root + '/lib/error.js');
 var AzureAuth = require(global.root + '/lib/azureAuth.js');
 var PowerBi = require(global.root + '/lib/powerBi.js');
 var sql = require("seriate");
