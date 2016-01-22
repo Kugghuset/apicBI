@@ -15,14 +15,12 @@ var azure = new AzureAuth();
 new ArgValues(['dataset']).then(function(args) {
     azure.getToken().then(function(data) {
         var powerBi = new PowerBi(data.token);
-        if(!_.isUndefined(args.reinit)) {
-            powerBi.reInit(args.dataset).then(function(result) {
-                console.log('APOA', result);
-            }).catch(function(error) { Error.print('Something went wrong', error); });
-        } else {
-            powerBi.init(args.dataset).then(function(result) {
-                console.log(result.message);
-            }).catch(function(error) { Error.print('Something went wrong', error); });
-        }
+        powerBi.listTables(args.dataset, false).then(function(result) {
+            for(var a = 0; a < result.tables.length; a++) {
+                powerBi.clearTable(result.dataset.id, result.tables[a].name).then(function(result) {
+                    console.log(result);
+                }).catch(function(error) { Error.print('Something went wrong', error); });
+            }
+        }).catch(function(error) { Error.print('Something went wrong', error); });
     }).catch(function(error) { Error.print('Something went wrong', error); });
-}).catch(function(error) { Error.print('Something went wrong', error); });
+}).catch(function(error) { Error.print('Something went wrong', error); });;
