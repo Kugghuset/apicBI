@@ -13,7 +13,7 @@ var database = require('../configs/database');
 sql.setDefaultConfig(database.ic);
 
 // Filapath to the storage file
-var filePath = path.resolve('../assets/lastUpdated.txt');
+var filePath = path.resolve('assets/lastUpdated.txt');
 
 function DB2BI() {}
 
@@ -103,12 +103,6 @@ DB2BI.read = function() {
                         console.log(error);
                     });
                     
-                    // Table names will be be prefixed with 'day_' or 'week_'
-                    powerBi.addRows(datasetId, [key,'aggregated'].join('_'), value).then(function(result) {
-                        console.log([key,'aggregated'].join('_') + ' sent ' + value.length + ' rows. ' + moment().format('YYYY-MM-DD HH:mm'));
-                    }).catch(function(error) {
-                        console.log(error);
-                    });
                 }
             })
 

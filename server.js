@@ -6,7 +6,6 @@ var DB2BI = require('./controllers/db2bi');
 var ClearTable = require('./controllers/clearTable');
 
 
-
 // Schedule which will run every 10 seconds
 var every10Seconds = later.parse.recur()
     .every(10).second();
@@ -15,7 +14,6 @@ var every10Seconds = later.parse.recur()
 // Schedule which will run at the change och day, every day.
 var everyStartOfDay = later.parse.recur()
     .first().hour();
-
 
 // Schedule which will run at the change of weeks.
 var everyStartOfWeek = later.parse.recur()

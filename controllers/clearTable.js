@@ -1,6 +1,6 @@
 var Promise = require('bluebird');
-var AzureAuth = require(global.root + '/lib/azureAuth.js');
-var PowerBi = require(global.root + '/lib/powerBi.js');
+var AzureAuth = require('../lib/azureAuth');
+var PowerBi = require('../lib/powerBi');
 
 function ClearTable() {}
 
