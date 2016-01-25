@@ -59,8 +59,8 @@ WHERE [CallDirection] = 'Inbound'
  * [Agent]                                      Name of the agent
  * [Call duration in seconds]                   The call length in seconds
  * [Waiting time in seconds]                    The waiting time in seconds
- * [Is under 60]                                Boolean value for whether the call length is under 60 or not
- * [Nullable call duration]						The call length if it's below 60, otherwise NULL
+ * [Waiting time is under 60]                   100 or 0 for whether the call length waiting time is under 60 or not
+ * [Nullable waiting time]						The call length if it's below 60, otherwise NULL
  * [Date connected]                             The time of the agent answering
  * [Date disconnected]                          The time of the agent disconnecting the call
  * [I3TimeStampGMT]                             The time of insert of the row
@@ -69,13 +69,13 @@ SELECT [iDetails].[FirstName] + ' ' + [iDetails].[LastName] AS [Agent]
      , [cView].[CallDurationSeconds] AS [Call duration in seconds]
      , [cView].[tQueueWait] / 1000 AS [Waiting time in seconds]
 	 , CASE
-        WHEN [cView].[CallDurationSeconds] < 60 THEN 1
+        WHEN ([cView].[tQueueWait] / 1000) < 60 THEN 100
         ELSE 0
-      END AS [Is under 60]
+      END AS [Waiting time is under 60]
 	 , CASE
-        WHEN [cView].[CallDurationSeconds] < 60 THEN [cView].[CallDurationSeconds]
+        WHEN ([cView].[tQueueWait] / 1000) < 60 THEN ([cView].[tQueueWait] / 1000)
         ELSE NULL
-      END AS [Nullable call duration]
+      END AS [Nullable waiting time]
      , [cView].[ConnectedDate] AS [Date connected]
      , [cView].[TerminatedDate] AS [Date disconnected]
      , [cView].[I3TimeStampGMT]
