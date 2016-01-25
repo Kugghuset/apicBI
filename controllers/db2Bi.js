@@ -78,11 +78,14 @@ DB2BI.read = function() {
                 todayOnly = _.map(recordset, function (row) { return _.omit(row, 'I3TimeStampGMT'); });
             }
             
+            // Remove the proprety I3TimeStamp from all items.
             recordset = _.map(recordset, function (row) { return _.omit(row, 'I3TimeStampGMT'); });
             
             // Save the timestamp for future use, if there is one
             if (latest && latest.I3TimeStampGMT) {
-                fs.writeFileSync(filePath, latest.I3TimeStampGMT.getTime());
+                var timestamp = latest.I3TimeStampGMT.getTime() + 5;
+                console.log('Writing new timestamp: ' + timestamp + ', which is: ' + moment(timestamp).format('YYYY-MM-DD HH:mm:SSS'))
+                fs.writeFileSync(filePath, timestamp);
             }
             
             // recordset will allways be the same or greater than todayOnly, so it's valid to only check it's length;

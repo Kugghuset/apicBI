@@ -20,6 +20,7 @@ var everyStartOfWeek = later.parse.recur()
     .on(2).dayOfWeek()
     .first().hour();
 
+console.log('Running schedules, waiting for updates...');
 // Regular update
 later.setInterval(DB2BI.read, every10Seconds);
 
