@@ -1,14 +1,22 @@
-global.root = __dirname;
-
+var chalk = require('chalk');
 var env = require('node-env-file');
-env(global.root + '/.env');
+env('./.env');
 
 var _ = require('lodash');
 
-var Error = require(global.root + '/lib/error.js');
-var ArgValues = require(global.root + '/lib/argValues.js');
-var AzureAuth = require(global.root + '/lib/azureAuth.js');
-var PowerBi = require(global.root + '/lib/powerBi.js');
+var ArgValues = require('./lib/argValues');
+var AzureAuth = require('./lib/azureAuth');
+var PowerBi = require('./lib/powerBi');
+
+/**
+ * Prints the error in a red color.
+ * param {Any} err
+ */
+function printError(message, err) {
+  console.log(chalk.red(message));
+  console.log(err);
+  console.log('\n');
+}
 
 var azure = new AzureAuth();
 
@@ -19,8 +27,8 @@ new ArgValues(['dataset']).then(function(args) {
             for(var a = 0; a < result.tables.length; a++) {
                 powerBi.clearTable(result.dataset.id, result.tables[a].name).then(function(result) {
                     console.log(result);
-                }).catch(function(error) { Error.print('Something went wrong', error); });
+                }).catch(function(error) { printError('Something went wrong', error); });
             }
-        }).catch(function(error) { Error.print('Something went wrong', error); });
-    }).catch(function(error) { Error.print('Something went wrong', error); });
-}).catch(function(error) { Error.print('Something went wrong', error); });;
+        }).catch(function(error) { printError('Something went wrong', error); });
+    }).catch(function(error) { printError('Something went wrong', error); });
+}).catch(function(error) { printError('Something went wrong', error); });;
