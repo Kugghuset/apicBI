@@ -20,3 +20,5 @@ ClearTable.run = function(table) {
         }).catch(function(error) { console.log(error); });
     }).catch(function(error) { console.log(error); });
 }
+
+module.exports = ClearTable;
