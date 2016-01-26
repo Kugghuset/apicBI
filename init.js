@@ -1,3 +1,4 @@
+var chalk = require('chalk');
 var env = require('node-env-file');
 env('./.env');
 
@@ -9,17 +10,29 @@ var PowerBi = require('./lib/powerBi');
 
 var azure = new AzureAuth();
 
+
+/**
+ * Prints the error in a red color.
+ * param {Any} err
+ */
+function printError(err) {
+    console.log('\n');
+    console.log(chalk.red('Something went wrong.'));
+    console.log(err);
+    console.log('\n');
+}
+
 new ArgValues(['dataset']).then(function(args) {
     azure.getToken().then(function(data) {
         var powerBi = new PowerBi(data.token);
         if(!_.isUndefined(args.reinit)) {
             powerBi.reInit(args.dataset, !_.isUndefined(args.table) ? args.table : undefined).then(function(result) {
                 console.log(result);
-            }).catch(function(error) { Error.print('Something went wrong', error); });
+            }).catch(printError);
         } else {
             powerBi.init(args.dataset).then(function(result) {
                 console.log(result.message);
-            }).catch(function(error) { console.log('Something went wrong', error); });
+            }).catch(printError);
         }
-    }).catch(function(error) { console.log('Something went wrong', error); });
-}).catch(function(error) { console.log('Something went wrong', error); });
+    }).catch(printError);
+}).catch(printError);
