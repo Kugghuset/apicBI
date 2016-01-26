@@ -41,6 +41,6 @@ node_modules
 
 .vscode
 
-lastUpdated.txt
+lastUpdated.*
 **/typings
 tsd.json

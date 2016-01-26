@@ -8,34 +8,45 @@ var moment = require('moment');
 var _ = require('lodash');
 
 var database = require('../configs/database');
+var stateHandler = require('./stateHandler');
 
 // Init only needed once
 sql.setDefaultConfig(database.ic);
 
 // Filapath to the storage file
-var filePath = path.resolve('assets/lastUpdated.txt');
+var filepath = path.resolve('assets/lastUpdated.json');
+
+// Old filepath for migration if it exists
+var old_filepath = path.resolve('assets/lastUpdated.txt');
+
+/**
+ * Will run on startup and should really only run once.
+ */
+stateHandler.migrateTxtToJson(old_filepath, filepath);
 
 function DB2BI() {}
 
 DB2BI.read = function() {
     var azure = new AzureAuth();
     
-    azure.getToken().then(function(data) {        
+    azure.getToken().then(function(data) {
         var powerBi = new PowerBi(data.token);
+        
+        var lastUpdatedData = stateHandler.readJsonFile(filepath);
         
         // Set last updated to either the time found in assets/lastUpdate.txt
         // Or to the start of this week if there is none in the file.
-        var lastUpdated = fs.existsSync(filePath)
-            ? fs.readFileSync(filePath, 'utf8')
+        var lastUpdated = !!lastUpdatedData.timestamp
+            ? lastUpdatedData.timestamp
             : moment().startOf('week').valueOf();
         
         function getQuery() {
             return sql.execute({
-                query: sql.fromFile('../sql/poll_per_agent_call_length_this_week.sql'),
+                query: sql.fromFile('../sql/polling_agents.sql'),
                 params: {
                     LastUpdate: {
                         type: sql.DATETIME2,
-                        val: new Date(parseInt(lastUpdated))
+                        val: new Date(parseInt(lastUpdated.timestamp))
                     }
                 }
             });
@@ -84,8 +95,8 @@ DB2BI.read = function() {
             // Save the timestamp for future use, if there is one
             if (latest && latest.I3TimeStampGMT) {
                 var timestamp = latest.I3TimeStampGMT.getTime() + 5;
-                console.log('Writing new timestamp: ' + timestamp + ', which is: ' + moment(timestamp).format('YYYY-MM-DD HH:mm:SSS'))
-                fs.writeFileSync(filePath, timestamp);
+                console.log('Writing new timestamp: ' + timestamp + ', which is: ' + moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS'));
+                stateHandler.writeJsonFile(filepath, { timestamp: timestamp, timeString: moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS') });
             }
             
             // recordset will allways be the same or greater than todayOnly, so it's valid to only check it's length;

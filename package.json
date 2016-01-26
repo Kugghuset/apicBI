@@ -3,7 +3,9 @@
   "version": "0.0.2",
   "scripts": {
     "start": "node server.js",
-    "init": "node init.js"
+    "init": "node init.js",
+    "clean": "node clean.js -dataset ApicBI",
+    "reinit": "node init.js -dataset ApicBI -reinit 1"
   },
   "description": "A communication layer between ICWS and Power BI",
   "main": "index.js",

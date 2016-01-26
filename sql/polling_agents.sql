@@ -58,7 +58,9 @@ WHERE [CallDirection] = 'Inbound'
  * Output per row:
  * [Agent]                                      Name of the agent
  * [Call duration in seconds]                   The call length in seconds
+ * [Call duration in minutes]                   The call length in minutes
  * [Waiting time in seconds]                    The waiting time in seconds
+ * [Waiting time in minutes]                    The waiting time in minutes
  * [Is under 60]                                100 or 0 for whether the waiting time is under 60 or not
  * [Nullable waiting time]						The call length if it's below 60, otherwise NULL
  * [Date connected]                             The time of the agent answering
@@ -67,7 +69,9 @@ WHERE [CallDirection] = 'Inbound'
 ***************************************************************************/
 SELECT [iDetails].[FirstName] + ' ' + [iDetails].[LastName] AS [Agent]
      , [cView].[CallDurationSeconds] AS [Call duration in seconds]
+     , CAST([cView].[CallDurationSeconds] / 60 AS Float) AS [Call duration in minutes]
      , [cView].[tQueueWait] / 1000 AS [Waiting time in seconds]
+     , CAST(([cView].[tQueueWait] / 1000) / 60 AS Float) AS [Waiting time in minutes]
 	 , CASE
         WHEN ([cView].[tQueueWait] / 1000) < 60 THEN 100
         ELSE 0
