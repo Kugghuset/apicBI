@@ -101,7 +101,7 @@ DB2BI.read = function() {
         
         function getQuery() {
             return sql.execute({
-                query: sql.fromFile('../sql/poll_per_agent_call_length_this_week.sql'),
+                query: sql.fromFile('../sql/polling_agents.sql'),
                 params: {
                     LastUpdate: {
                         type: sql.DATETIME2,
