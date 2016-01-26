@@ -1,6 +1,7 @@
 
 -- Will be set in JavaScript
--- DECLARE @LastUpdate DateTime2 = '2016-01-18 00:00'
+-- DECLARE @LastUpdate DateTime2 = '2016-01-25 00:00'
+
 
 -- Filter variables
 DECLARE @Now DateTime2 = GETDATE()
@@ -35,7 +36,7 @@ DECLARE @ThisWeeksCalls TABLE (
   , [ConnectedDate] DateTime2 NULL
   , [TerminatedDate] DateTime2 NULL
   , [I3TimeStampGMT] DateTime2 NULL
-  , [tQueueWait] Int NULL
+  , [tQueueWaitSeconds] Int NULL
 )
 -- Populate @ThisWeeksCalls
 INSERT INTO @ThisWeeksCalls
@@ -44,7 +45,7 @@ SELECT [LocalUserId]
      , [ConnectedDate]
      , [TerminatedDate]
      , [I3TimeStampGMT]
-     , [tQueueWait]
+     , [tQueueWait] / 1000
 FROM [SP_I3_IC].[dbo].[calldetail_viw]
 WHERE [CallDirection] = 'Inbound'
   AND [ConnectedDate] != '1970-01-01 01:00:00.000'
@@ -69,15 +70,15 @@ WHERE [CallDirection] = 'Inbound'
 ***************************************************************************/
 SELECT [iDetails].[FirstName] + ' ' + [iDetails].[LastName] AS [Agent]
      , [cView].[CallDurationSeconds] AS [Call duration in seconds]
-     , CAST([cView].[CallDurationSeconds] / 60 AS Float) AS [Call duration in minutes]
-     , [cView].[tQueueWait] / 1000 AS [Waiting time in seconds]
-     , CAST(([cView].[tQueueWait] / 1000) / 60 AS Float) AS [Waiting time in minutes]
+     , CAST(ROUND(([cView].[CallDurationSeconds] + 0.0) / 60, 2) AS Float) AS [Call duration in minutes]
+     , [cView].[tQueueWaitSeconds] AS [Waiting time in seconds]
+     , CAST(ROUND(([cView].[tQueueWaitSeconds] + 0.0) / 60 , 2) AS Float) AS [Waiting time in minutes]
 	 , CASE
-        WHEN ([cView].[tQueueWait] / 1000) < 60 THEN 100
+        WHEN [cView].[tQueueWaitSeconds] < 60 THEN 100
         ELSE 0
       END AS [Is under 60]
 	 , CASE
-        WHEN ([cView].[tQueueWait] / 1000) < 60 THEN ([cView].[tQueueWait] / 1000)
+        WHEN [cView].[tQueueWaitSeconds] < 60 THEN ([cView].[tQueueWaitSeconds])
         ELSE NULL
       END AS [Nullable waiting time]
      , [cView].[ConnectedDate] AS [Date connected]
@@ -91,7 +92,7 @@ FROM [SP_I3_IC].[dbo].[IndivDetails] AS [iDetails]
 LEFT JOIN (
     SELECT [LocalUserId] AS [UserId]
          , [CallDurationSeconds]
-         , [tQueueWait]
+         , [tQueueWaitSeconds]
          , [ConnectedDate]
          , [TerminatedDate]
          , [I3TimeStampGMT]
