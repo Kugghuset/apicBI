@@ -51,6 +51,7 @@ WHERE [CallDirection] = 'Inbound'
   AND [ConnectedDate] != '1970-01-01 01:00:00.000'
   AND [ConnectedDate] > @StartOfWeek
   AND [I3TimeStampGMT] > @LastUpdate
+  AND [CallType] != 'Intercom'
   AND [LocalUserId] IN (SELECT * FROM @ActiveAgents)
 
 /***************************************************************************
