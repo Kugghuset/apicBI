@@ -8,6 +8,7 @@ var moment = require('moment');
 var _ = require('lodash');
 
 var database = require('../configs/database');
+var stateHandler = require('./stateHandler');
 
 // Init only needed once
 sql.setDefaultConfig(database.ic);
@@ -15,73 +16,13 @@ sql.setDefaultConfig(database.ic);
 // Filapath to the storage file
 var filepath = path.resolve('assets/lastUpdated.json');
 
-/**
- * Reads the filecontents and returns an object containing it.
- * 
- * @param {string} filepath Relative or absolute path to file
- * @return {object} If file exists, the file contents, otherwise an empty object
- */
-function readJsonFile(_filepath) {
-    
-    // Make sure the path works on this system
-    var _path = path.resolve(_filepath);
-    
-    // Check the file exists
-    if (fs.existsSync(_path)) {
-        var fileContents = fs.readFileSync(_path, 'utf8');
-        
-        var parsed = _.attempt(function () { return JSON.parse(fileContents); });
-        return _.isError(parsed)
-            ? { data: fileContents }
-            : parsed;
-    } else {
-        return {};
-    }
-  
-}
+// Old filepath for migration if it exists
+var old_filepath = path.resolve('assets/lastUpdated.txt');
 
 /**
- * Writes the object to a file.
- * 
- * @param {object} content Data
- * @return {Boolean}
+ * Will run on startup and should really only run once.
  */
-function writeJsonFile(_filepath, content) {
-    
-    // No content or filepath means trouble.
-    if (!_filepath || !content) {
-        return false;
-    }
-    
-    // make sure the path works on this system.
-    var _path = path.resolve(_filepath);
-    
-    var data;
-    var parsed = _.attempt(function () { return JSON.parse(content); })
-    
-    // Check if *content* is a JSON object
-    if (_.isError(parsed)) {
-        // Content is not a JSON object
-        
-        // Try stringify it
-        data = _.attempt(function () {
-            return JSON.stringify(content);
-        });
-        
-        // If something went wrong, stringify an object with the property data set to *content*.
-        if (_.isError(data)) {
-            data = JSON.stringify({ data: content });
-        }
-    } else {
-        // Content already is a JSON object
-        data = content;
-    }
-    
-    // Write the file
-    fs.writeFileSync(_path, data);
-    
-    return true;
-}
+stateHandler.migrateTxtToJson(old_filepath, filepath);
 
 function DB2BI() {}
 
@@ -91,7 +32,7 @@ DB2BI.read = function() {
     azure.getToken().then(function(data) {
         var powerBi = new PowerBi(data.token);
         
-        var lastUpdatedData = readJsonFile(filepath);
+        var lastUpdatedData = stateHandler.readJsonFile(filepath);
         
         // Set last updated to either the time found in assets/lastUpdate.txt
         // Or to the start of this week if there is none in the file.
@@ -154,8 +95,8 @@ DB2BI.read = function() {
             // Save the timestamp for future use, if there is one
             if (latest && latest.I3TimeStampGMT) {
                 var timestamp = latest.I3TimeStampGMT.getTime() + 5;
-                console.log('Writing new timestamp: ' + timestamp + ', which is: ' + moment(timestamp).format('YYYY-MM-DD HH:mm:SSS'));
-                writeJsonFile(filepath, { timestamp: timestamp, timeString: moment(timestamp).format('YYYY-MM-DD HH:mm:SSS') });
+                console.log('Writing new timestamp: ' + timestamp + ', which is: ' + moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS'));
+                stateHandler.writeJsonFile(filepath, { timestamp: timestamp, timeString: moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS') });
             }
             
             // recordset will allways be the same or greater than todayOnly, so it's valid to only check it's length;
