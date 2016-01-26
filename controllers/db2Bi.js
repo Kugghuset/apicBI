@@ -46,7 +46,7 @@ DB2BI.read = function() {
                 params: {
                     LastUpdate: {
                         type: sql.DATETIME2,
-                        val: new Date(parseInt(lastUpdated.timestamp))
+                        val: new Date(parseInt(lastUpdated))
                     }
                 }
             });
