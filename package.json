@@ -5,7 +5,9 @@
     "start": "node server.js",
     "init": "node init.js",
     "clean": "node clean.js -dataset ApicBI",
-    "reinit": "node init.js -dataset ApicBI -reinit 1"
+    "reinit": "node init.js -dataset ApicBI -reinit 1",
+    "kill_history": "node kill_history.js -filepath assets/lastUpdated.json",
+    "reset": "npm run clean && npm run reinit && npm run kill_history"
   },
   "description": "A communication layer between ICWS and Power BI",
   "main": "index.js",
