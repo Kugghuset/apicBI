@@ -13,20 +13,90 @@ var database = require('../configs/database');
 sql.setDefaultConfig(database.ic);
 
 // Filapath to the storage file
-var filePath = path.resolve('assets/lastUpdated.txt');
+var filepath = path.resolve('assets/lastUpdated.json');
+
+/**
+ * Reads the filecontents and returns an object containing it.
+ * 
+ * @param {string} filepath Relative or absolute path to file
+ * @return {object} If file exists, the file contents, otherwise an empty object
+ */
+function readJsonFile(_filepath) {
+    
+    // Make sure the path works on this system
+    var _path = path.resolve(_filepath);
+    
+    // Check the file exists
+    if (fs.existsSync(_path)) {
+        var fileContents = fs.readFileSync(_path, 'utf8');
+        
+        var parsed = _.attempt(function () { return JSON.parse(fileContents); });
+        return _.isError(parsed)
+            ? { data: fileContents }
+            : parsed;
+    } else {
+        return {};
+    }
+  
+}
+
+/**
+ * Writes the object to a file.
+ * 
+ * @param {object} content Data
+ * @return {Boolean}
+ */
+function writeJsonFile(_filepath, content) {
+    
+    // No content or filepath means trouble.
+    if (!_filepath || !content) {
+        return false;
+    }
+    
+    // make sure the path works on this system.
+    var _path = path.resolve(_filepath);
+    
+    var data;
+    var parsed = _.attempt(function () { return JSON.parse(content); })
+    
+    // Check if *content* is a JSON object
+    if (_.isError(parsed)) {
+        // Content is not a JSON object
+        
+        // Try stringify it
+        data = _.attempt(function () {
+            return JSON.stringify(content);
+        });
+        
+        // If something went wrong, stringify an object with the property data set to *content*.
+        if (_.isError(data)) {
+            data = JSON.stringify({ data: content });
+        }
+    } else {
+        // Content already is a JSON object
+        data = content;
+    }
+    
+    // Write the file
+    fs.writeFileSync(_path, data);
+    
+    return true;
+}
 
 function DB2BI() {}
 
 DB2BI.read = function() {
     var azure = new AzureAuth();
     
-    azure.getToken().then(function(data) {        
+    azure.getToken().then(function(data) {
         var powerBi = new PowerBi(data.token);
+        
+        var lastUpdatedData = readJsonFile(filepath);
         
         // Set last updated to either the time found in assets/lastUpdate.txt
         // Or to the start of this week if there is none in the file.
-        var lastUpdated = fs.existsSync(filePath)
-            ? fs.readFileSync(filePath, 'utf8')
+        var lastUpdated = !!lastUpdatedData.timestamp
+            ? lastUpdatedData.timestamp
             : moment().startOf('week').valueOf();
         
         function getQuery() {
@@ -35,7 +105,7 @@ DB2BI.read = function() {
                 params: {
                     LastUpdate: {
                         type: sql.DATETIME2,
-                        val: new Date(parseInt(lastUpdated))
+                        val: new Date(parseInt(lastUpdated.timestamp))
                     }
                 }
             });
@@ -84,8 +154,8 @@ DB2BI.read = function() {
             // Save the timestamp for future use, if there is one
             if (latest && latest.I3TimeStampGMT) {
                 var timestamp = latest.I3TimeStampGMT.getTime() + 5;
-                console.log('Writing new timestamp: ' + timestamp + ', which is: ' + moment(timestamp).format('YYYY-MM-DD HH:mm:SSS'))
-                fs.writeFileSync(filePath, timestamp);
+                console.log('Writing new timestamp: ' + timestamp + ', which is: ' + moment(timestamp).format('YYYY-MM-DD HH:mm:SSS'));
+                writeJsonFile(filepath, { timestamp: timestamp, timeString: moment(timestamp).format('YYYY-MM-DD HH:mm:SSS') });
             }
             
             // recordset will allways be the same or greater than todayOnly, so it's valid to only check it's length;
