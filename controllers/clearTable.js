@@ -12,7 +12,7 @@ ClearTable.run = function(table) {
     azure.getToken().then(function(data) {        
         var powerBi = new PowerBi(data.token);
         powerBi.datasetExists('ApicBI').then(function(result) {
-            powerBi.clearTable(result.dataset.id, 'table').then(function(result) {
+            powerBi.clearTable(result.dataset.id, table).then(function(result) {
                 console.log(result);
             }).catch(function(error) {
                 console.log(error);
