@@ -78,13 +78,6 @@ DB2BI.read = function() {
                        
             var todayOnly;
             
-            if (recordset && recordset.length) {
-                console.log('\n\n')
-                _.forEach(recordset, function (item) { console.log(item.TerminatedDateTimeGMT); });
-                console.log('\n\n')
-                
-            }
-            
             // Check if the date is the very same as the start of this week
             // this should only work on first boot.
             if (lastUpdated === moment().startOf('week').valueOf()) {
