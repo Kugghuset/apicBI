@@ -22,7 +22,7 @@ WHERE [LocalUserId] != '-'
     AND [CallDirection] = 'Inbound'
     AND [ConnectedDate] != '1970-01-01 01:00:00.000'
     AND [ConnectedDate] > @StartOfWeek
-    AND [I3TimeStampGMT] > @LastUpdate
+    AND [TerminatedDateTimeGMT] > @LastUpdate
 GROUP BY [LocalUserId]
 
 /*
@@ -35,7 +35,7 @@ DECLARE @ThisWeeksCalls TABLE (
   , [CallDurationSeconds] Int NULL
   , [ConnectedDate] DateTime2 NULL
   , [TerminatedDate] DateTime2 NULL
-  , [I3TimeStampGMT] DateTime2 NULL
+  , [TerminatedDateTimeGMT] DateTime2 NULL
   , [tQueueWaitSeconds] Int NULL
 )
 -- Populate @ThisWeeksCalls
@@ -44,13 +44,13 @@ SELECT [LocalUserId]
      , [CallDurationSeconds]
      , [ConnectedDate]
      , [TerminatedDate]
-     , [I3TimeStampGMT]
+     , [TerminatedDateTimeGMT]
      , [tQueueWait] / 1000
 FROM [SP_I3_IC].[dbo].[calldetail_viw]
 WHERE [CallDirection] = 'Inbound'
   AND [ConnectedDate] != '1970-01-01 01:00:00.000'
   AND [ConnectedDate] > @StartOfWeek
-  AND [I3TimeStampGMT] > @LastUpdate
+  AND [TerminatedDateTimeGMT] > @LastUpdate
   AND [CallType] != 'Intercom'
   AND [LocalUserId] IN (SELECT * FROM @ActiveAgents)
 
@@ -67,7 +67,7 @@ WHERE [CallDirection] = 'Inbound'
  * [Nullable waiting time]						The call length if it's below 60, otherwise NULL
  * [Date connected]                             The time of the agent answering
  * [Date disconnected]                          The time of the agent disconnecting the call
- * [I3TimeStampGMT]                             The time of insert of the row
+ * [TerminatedDateTimeGMT]                             The time of insert of the row
 ***************************************************************************/
 SELECT [iDetails].[FirstName] + ' ' + [iDetails].[LastName] AS [Agent]
      , [cView].[CallDurationSeconds] AS [Call duration in seconds]
@@ -84,7 +84,7 @@ SELECT [iDetails].[FirstName] + ' ' + [iDetails].[LastName] AS [Agent]
       END AS [Nullable waiting time]
      , [cView].[ConnectedDate] AS [Date connected]
      , [cView].[TerminatedDate] AS [Date disconnected]
-     , [cView].[I3TimeStampGMT]
+     , [cView].[TerminatedDateTimeGMT]
 FROM [SP_I3_IC].[dbo].[IndivDetails] AS [iDetails]
 
 /*
@@ -96,12 +96,12 @@ LEFT JOIN (
          , [tQueueWaitSeconds]
          , [ConnectedDate]
          , [TerminatedDate]
-         , [I3TimeStampGMT]
+         , [TerminatedDateTimeGMT]
     FROM @ThisWeeksCalls
-    WHERE [I3TimeStampGMT] > @LastUpdate
+    WHERE [TerminatedDateTimeGMT] > @LastUpdate
     ) AS [cView]
 ON [iDetails].[ICUserID] = [cView].[UserId]
 
 -- Only use agents which have been active TODAY.
 WHERE [ICUserID] IN (SELECT * FROM @ActiveAgents)
-ORDER BY [I3TimeStampGMT] DESC
+ORDER BY [TerminatedDateTimeGMT] DESC

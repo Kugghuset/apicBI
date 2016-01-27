@@ -46,7 +46,7 @@ DB2BI.read = function() {
                 params: {
                     LastUpdate: {
                         type: sql.DATETIME2,
-                        val: new Date(parseInt(lastUpdated))
+                        val: new Date(lastUpdated)
                     }
                 }
             });
@@ -73,28 +73,35 @@ DB2BI.read = function() {
             
             // Get the latest value from the table, if any
             var latest = _.map(recordset).sort(function (a, b) {
-                return moment(a.I3TimeStampGMT).isAfter(b.I3TimeStampGMT);
+                return moment(a.TerminatedDateTimeGMT).isAfter(b.TerminatedDateTimeGMT);
             }).pop();
-            
+                       
             var todayOnly;
+            
+            if (recordset && recordset.length) {
+                console.log('\n\n')
+                _.forEach(recordset, function (item) { console.log(item.TerminatedDateTimeGMT); });
+                console.log('\n\n')
+                
+            }
             
             // Check if the date is the very same as the start of this week
             // this should only work on first boot.
-            if (parseInt(lastUpdated) === moment().startOf('week').valueOf()) {
+            if (lastUpdated === moment().startOf('week').valueOf()) {
                 todayOnly = _.chain(recordset)
-                    .filter(function (item) { return moment().startOf('day').isBefore(item.I3TimeStampGMT); })
-                    .map(function (row) { return _.omit(row, 'I3TimeStampGMT'); })
+                    .filter(function (item) { return moment().startOf('day').isBefore(item.TerminatedDateTimeGMT); })
+                    .map(function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); })
                     .value();
             } else {
-                todayOnly = _.map(recordset, function (row) { return _.omit(row, 'I3TimeStampGMT'); });
+                todayOnly = _.map(recordset, function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); });
             }
             
             // Remove the proprety I3TimeStamp from all items.
-            recordset = _.map(recordset, function (row) { return _.omit(row, 'I3TimeStampGMT'); });
+            recordset = _.map(recordset, function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); });
             
             // Save the timestamp for future use, if there is one
-            if (latest && latest.I3TimeStampGMT) {
-                var timestamp = latest.I3TimeStampGMT.getTime() + 5;
+            if (latest && latest.TerminatedDateTimeGMT) {
+                var timestamp = latest.TerminatedDateTimeGMT.getTime() + 5;
                 console.log('Writing new timestamp: ' + timestamp + ', which is: ' + moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS'));
                 stateHandler.writeJsonFile(filepath, { timestamp: timestamp, timeString: moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS') });
             }
