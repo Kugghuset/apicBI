@@ -230,10 +230,10 @@ DB2BI.read = function read(attempt) {
             getQuery(lastUpdated)
         ])
         .then(function (data) {
-          pushData(data, powerBi, lastUpdated);
+            return pushData(data, powerBi, lastUpdated);
         })
         .catch(function (err) {
-            if (/not exists/i.test(err)) {
+            if (/(not exists|get datasetid)/i.test(err)) {
                 return read(attempt += 1);
             } else {
                 console.log(err);
