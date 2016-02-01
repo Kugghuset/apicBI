@@ -69,6 +69,7 @@ function getQuery(lastUpdated) {
  * @return {Boolean}
  */
 function saveTimeStamp(filepath, latest) {
+    
     if (!filepath) { return; }
     // Save the timestamp for future use, if there is one
     if (latest && latest.TerminatedDateTimeGMT) {
@@ -85,68 +86,80 @@ function saveTimeStamp(filepath, latest) {
  * @param {Object} powerBi
  */
 function pushData(data, powerBi, lastUpdated) {
-
-    // Get the datasetId from the response object
-    var datasetId = _.attempt(function () { return data[0].value().dataset.id });
-    if (_.isError(datasetId)) {
-        // return early, do something about it?
-        return console.log('Could not get datasetId');
-    }
-    
-    // Filter out any incorrect items.
-    recordset = _.filter(recordset, function (item) { return item && item.TerminatedDateTimeGMT;  });
-
-    // Get the recordset
-    var recordset = _.attempt(function () { return data[1].value(); });
-    if (_.isError(recordset)) {
-        return console.log('Could not get recordset from the database.')
-    }
-
-    // Get the latest value from the table, if any
-    var latest = _.map(recordset).sort(function (a, b) {
-        return moment(a.TerminatedDateTimeGMT).isAfter(b.TerminatedDateTimeGMT);
-    }).pop();
-                
-    var todayOnly;
-
-    // Check if the date is the very same as the start of this week
-    // this should only work on first boot.
-    if (lastUpdated === moment().startOf('week').valueOf()) {
-        todayOnly = _.chain(recordset)
-            .filter(function (item) { return moment().startOf('day').isBefore(item.TerminatedDateTimeGMT); })
-            .map(function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); })
-            .value();
-    } else {
-        todayOnly = _.map(recordset, function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); });
-    }
-
-    // Remove the property TerminatedDateTimeGMT from all items.
-    recordset = _.map(recordset, function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); });
-
-    // recordset will allways be the same or greater than todayOnly, so it's valid to only check it's length;
-    if (recordset && recordset.length) {
-        console.log('New data found! Sending at: ' + moment().format('YYYY-MM-DD HH:mm'));
-    }
-
-    // Save the timestamp for future use, if there is one
-    saveTimeStamp(filepath, latest);
-
-    // Iterate over data for the current day and the current week
-    _.forEach({ day: todayOnly, week: recordset }, function (value, key) {
-        
-        // Only make the request if there's been an update.
-        if (value && value.length) {
-            
-            // Table names will be be prefixed with 'day_' or 'week_'
-            powerBi.addRows(datasetId, [key,'per_agent'].join('_'), value).then(function(result) {
-                console.log([key,'per_agent'].join('_') + ' sent ' + value.length + ' rows. ' + moment().format('YYYY-MM-DD HH:mm'));
-            }).catch(function(error) {
-                console.log(error);
-            });
-            
+    return new Promise(function (resolve, reject) {
+       
+        // Get the datasetId from the response object
+        var datasetId = _.attempt(function () { return data[0].value().dataset.id });
+        if (_.isError(datasetId)) {
+            // return early, do something about it?
+            console.log('Could not get datasetId');
+            return reject(new Error('Could not get datasetId.'));
         }
-    })
+        
+        // Get the recordset
+        var recordset = _.attempt(function () { return data[1].value(); });
+        if (_.isError(recordset)) {
+            console.log('Could not get recordset from the database.');
+            return reject(new Error('Could not get recordset from the database'));
+        }
 
+        // Filter out any incorrect items.
+        recordset = _.filter(recordset, function (item) { return item && item.TerminatedDateTimeGMT; });
+
+        // Get the latest value from the table, if any
+        var latest = _.map(recordset).sort(function (a, b) {
+            return moment(a.TerminatedDateTimeGMT).isAfter(b.TerminatedDateTimeGMT);
+        }).pop();
+
+        var todayOnly;
+
+        // Check if the date is the very same as the start of this week
+        // this should only work on first boot.
+        if (lastUpdated === moment().startOf('week').valueOf()) {
+            todayOnly = _.chain(recordset)
+                .filter(function (item) { return moment().startOf('day').isBefore(item.TerminatedDateTimeGMT); })
+                .map(function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); })
+                .value();
+        } else {
+            todayOnly = _.map(recordset, function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); });
+        }
+
+        // Remove the property TerminatedDateTimeGMT from all items.
+        recordset = _.map(recordset, function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); });
+
+        // recordset will allways be the same or greater than todayOnly, so it's valid to only check it's length;
+        if (recordset && recordset.length) {
+            console.log('New data found at: ' + moment().format('YYYY-MM-DD HH:mm') + '!');
+        }
+
+        // Save the timestamp for future use, if there is one
+        saveTimeStamp(filepath, latest);
+
+        var promises = _.map({ day: todayOnly, week: recordset }, function (value, key) {
+            return new Promise(function (resolve, reject) {
+                
+                // Only make the request if there's been an update.
+                if (value && value.length) {
+                    
+                    // Table names will be be prefixed with 'day_' or 'week_'
+                    powerBi.addRows(datasetId, [key, 'per_agent'].join('_'), value).then(function (result) {
+                        console.log([key, 'per_agent'].join('_') + ' sent ' + value.length + ' rows. ' + moment().format('YYYY-MM-DD HH:mm'));
+                        resolve(result);
+                    }).catch(reject);
+
+                } else {
+                    resolve({});
+                }
+            });
+        });
+        
+        // Iterate over data for the current day and the current week
+        Promise.all(_.map(promises, function (promise) { return promise.reflect(); }))
+        .then(function (data) {
+            resolve(_.map(data, function (val) { return val.value(); }));
+        })
+        .catch(reject);
+    });
 }
 
 /**
@@ -156,31 +169,40 @@ function pushData(data, powerBi, lastUpdated) {
  * @return {promise} -> {string}
  */
 function getToken(getNew) {
-  return new Promise(function (resolve, reject) {
-    
-    // for somereason get a new token
-    if (getNew || !fs.existsSync(tokenPath)) {
-        var azure = new AzureAuth();
-    
-        azure.getToken()
-        .then(function (data) {
-            stateHandler.writeJsonFile(tokenPath, data);
-            resolve(data.token);
-        })
-        .catch(reject);
-    } else {
-        
-        // Get the token from the token file.
-        var data = stateHandler.readJsonFile(tokenPath);
-        
-        if (data.token) {
-            resolve(data.token);
-        } else {
-            reject(new Error('No token found.'));
+    return new Promise(function (resolve, reject) {
+        // for somereason get a new token
+        var data
+        if (fs.existsSync(tokenPath)) {
+            data = stateHandler.readJsonFile(tokenPath);
         }
-    }
-    
-  });
+        
+        
+        
+        if (getNew || !data || !data.token || moment().subtract(50, 'minutes').isAfter(moment(parseInt(data.timestamp)))) {
+            
+            console.log('Fetching new token.');
+            
+            var azure = new AzureAuth();
+
+            azure.getToken()
+                .then(function (data) {
+                    console.log('Writing new token at: ' + moment().format('YYYY-MM-DD HH:mm'));
+                    stateHandler.writeJsonFile(tokenPath, _.assign({}, data, {
+                        timestamp: Date.now()
+                    }));
+                    resolve(data.token);
+                })
+                .catch(reject);
+        } else {
+            
+            if (data.token) {
+                resolve(data.token);
+            } else {
+                reject(new Error('No token found.'));
+            }
+        }
+
+    });
 }
 
 /**
@@ -191,7 +213,13 @@ function getToken(getNew) {
  */
 DB2BI.read = function read(attempt) {
     
-    getToken()
+    if (_.isUndefined(attempt)) { attempt = 0; }
+    
+    if (attempt > 10) {
+        return console.log('Failed too many times.');
+    }
+    
+    getToken(attempt > 0)
     .then(function(token) {
         var powerBi = new PowerBi(token);
         
@@ -205,7 +233,11 @@ DB2BI.read = function read(attempt) {
           pushData(data, powerBi, lastUpdated);
         })
         .catch(function (err) {
-            console.log(err);
+            if (/not exists/i.test(err)) {
+                return read(attempt += 1);
+            } else {
+                console.log(err);
+            }
         });
 
     });
