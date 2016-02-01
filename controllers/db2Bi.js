@@ -16,6 +16,8 @@ sql.setDefaultConfig(database.ic);
 // Filapath to the storage file
 var filepath = path.resolve('assets/lastUpdated.json');
 
+var tokenPath = path.resolve('assets/token.json');
+
 // Old filepath for migration if it exists
 var old_filepath = path.resolve('assets/lastUpdated.txt');
 
@@ -90,6 +92,9 @@ function pushData(data, powerBi, lastUpdated) {
         // return early, do something about it?
         return console.log('Could not get datasetId');
     }
+    
+    // Filter out any incorrect items.
+    recordset = _.filter(recordset, function (item) { return item && item.TerminatedDateTimeGMT;  });
 
     // Get the recordset
     var recordset = _.attempt(function () { return data[1].value(); });
@@ -144,11 +149,51 @@ function pushData(data, powerBi, lastUpdated) {
 
 }
 
-DB2BI.read = function() {
-    var azure = new AzureAuth();
+/**
+ * Gets either the local token or a new token.
+ * 
+ * @param {boolean} getNew
+ * @return {promise} -> {string}
+ */
+function getToken(getNew) {
+  return new Promise(function (resolve, reject) {
     
-    azure.getToken().then(function(data) {
-        var powerBi = new PowerBi(data.token);
+    // for somereason get a new token
+    if (getNew || !fs.existsSync(tokenPath)) {
+        var azure = new AzureAuth();
+    
+        azure.getToken()
+        .then(function (data) {
+            stateHandler.writeJsonFile(tokenPath, data);
+            resolve(data.token);
+        })
+        .catch(reject);
+    } else {
+        
+        // Get the token from the token file.
+        var data = stateHandler.readJsonFile(tokenPath);
+        
+        if (data.token) {
+            resolve(data.token);
+        } else {
+            reject(new Error('No token found.'));
+        }
+    }
+    
+  });
+}
+
+/**
+ * Reads the DB and pushes the data to Power BI.
+ * 
+ * 
+ * @param {number} attempt Set recursevly, DO NOT SET!
+ */
+DB2BI.read = function read(attempt) {
+    
+    getToken()
+    .then(function(token) {
+        var powerBi = new PowerBi(token);
         
         var lastUpdated = getLastUpdated();
         
