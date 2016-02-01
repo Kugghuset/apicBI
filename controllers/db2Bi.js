@@ -9,6 +9,7 @@ var _ = require('lodash');
 
 var database = require('../configs/database');
 var stateHandler = require('./stateHandler');
+var mail = require('../lib/mail');
 
 // Init only needed once
 sql.setDefaultConfig(database.ic);
@@ -206,6 +207,38 @@ function getToken(getNew) {
 }
 
 /**
+ * @param {number} attempt
+ * @return {promise}
+ */
+function notifyThreshold(attempt) {
+    
+    return mail.send('Too many attempts have been made.', [
+        'Hello, we have made to many attempts at pushing data to Power BI.',
+        'Number of attmepts: ' + attempt,
+        '',
+        'Best wishes,',
+        'The real time dashboard crew'
+    ].join('\n'));
+  
+}
+
+/**
+ * @param {error} err
+ * @return {promise}
+ */
+function notifyError(err) {
+  
+    return mail.send('An error occured', [
+        'Hello, the following error occured when trying to push data to Powe B:',
+        err,
+        '',
+        'Best wishes,',
+        'The real time dashboard crew'
+    ].join('\n'));
+  
+}
+
+/**
  * Reads the DB and pushes the data to Power BI.
  * 
  * 
@@ -216,6 +249,9 @@ DB2BI.read = function read(attempt) {
     if (_.isUndefined(attempt)) { attempt = 0; }
     
     if (attempt > 10) {
+        
+        notifyThreshold(attempt);
+        
         return console.log('Failed too many times.');
     }
     
@@ -236,6 +272,7 @@ DB2BI.read = function read(attempt) {
             if (/(not exists|get datasetid)/i.test(err)) {
                 return read(attempt += 1);
             } else {
+                notifyError(err);
                 console.log(err);
             }
         });
