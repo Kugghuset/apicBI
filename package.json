@@ -7,7 +7,8 @@
     "clean": "node clean.js -dataset ApicBI",
     "reinit": "node init.js -dataset ApicBI -reinit 1",
     "kill_history": "node kill_history.js -filepath assets/lastUpdated.json",
-    "reset": "npm run clean && npm run reinit && npm run kill_history"
+    "clear_token": "node kill_history.js -filepath assets/token.json",
+    "reset": "npm run clean && npm run reinit && npm run kill_history && npm run clear_token"
   },
   "description": "A communication layer between ICWS and Power BI",
   "main": "index.js",

@@ -67,7 +67,7 @@ WHERE [CallDirection] = 'Inbound'
  * [Nullable waiting time]						The call length if it's below 60, otherwise NULL
  * [Date connected]                             The time of the agent answering
  * [Date disconnected]                          The time of the agent disconnecting the call
- * [TerminatedDateTimeGMT]                             The time of insert of the row
+ * [TerminatedDateTimeGMT]                      The time of insert of the row
 ***************************************************************************/
 SELECT [iDetails].[FirstName] + ' ' + [iDetails].[LastName] AS [Agent]
      , [cView].[CallDurationSeconds] AS [Call duration in seconds]
