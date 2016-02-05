@@ -43,5 +43,6 @@ node_modules
 
 lastUpdated.*
 token.*
+datasets_*.*
 **/typings
 tsd.json
