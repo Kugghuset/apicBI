@@ -30,22 +30,6 @@ stateHandler.migrateTxtToJson(old_filepath, filepath);
 function DB2BI() {}
 
 /**
- * Gets the timestamp to compare with.
- * 
- * @param {String} filepath
- * @return {Date}
- */
-function getLastUpdated() {
-    var lastUpdatedData = stateHandler.readJsonFile(filepath);
-
-    // Set last updated to either the time found in assets/lastUpdate.txt
-    // Or to the start of this week if there is none in the file.
-    return !!lastUpdatedData.timestamp
-        ? lastUpdatedData.timestamp
-        : moment().startOf('week').valueOf();
-}
-
-/**
  * Gets new rows since *lastUpdated* from DB.
  * 
  * @param {Date} lastUpdated
@@ -88,7 +72,7 @@ function saveTimeStamp(filepath, latest) {
  */
 function pushData(data, powerBi, lastUpdated) {
     return new Promise(function (resolve, reject) {
-       
+        
         // Get the datasetId from the response object
         var datasetId = _.attempt(function () { return data[0].value().dataset.id });
         if (_.isError(datasetId)) {
@@ -164,49 +148,6 @@ function pushData(data, powerBi, lastUpdated) {
 }
 
 /**
- * Gets either the local token or a new token.
- * 
- * @param {boolean} getNew
- * @return {promise} -> {string}
- */
-function getToken(getNew) {
-    return new Promise(function (resolve, reject) {
-        // for somereason get a new token
-        var data
-        if (fs.existsSync(tokenPath)) {
-            data = stateHandler.readJsonFile(tokenPath);
-        }
-        
-        
-        
-        if (getNew || !data || !data.token || moment().subtract(50, 'minutes').isAfter(moment(parseInt(data.timestamp)))) {
-            
-            console.log('Fetching new token.');
-            
-            var azure = new AzureAuth();
-
-            azure.getToken()
-                .then(function (data) {
-                    console.log('Writing new token at: ' + moment().format('YYYY-MM-DD HH:mm'));
-                    stateHandler.writeJsonFile(tokenPath, _.assign({}, data, {
-                        timestamp: Date.now()
-                    }));
-                    resolve(data.token);
-                })
-                .catch(reject);
-        } else {
-            
-            if (data.token) {
-                resolve(data.token);
-            } else {
-                reject(new Error('No token found.'));
-            }
-        }
-
-    });
-}
-
-/**
  * @param {number} attempt
  * @return {promise}
  */
@@ -245,26 +186,28 @@ function notifyError(err) {
  * @param {number} attempt Set recursevly, DO NOT SET!
  */
 DB2BI.read = function read(attempt) {
-    
+
     if (_.isUndefined(attempt)) { attempt = 0; }
-    
+
     if (attempt > 10) {
-        
+
         notifyThreshold(attempt);
-        
+
         return console.log('Failed too many times.');
     }
-    
-    getToken(attempt > 0)
-    .then(function(token) {
+
+    stateHandler.getToken(attempt > 0)
+    .then(function (token) {
         var powerBi = new PowerBi(token);
-        
-        var lastUpdated = getLastUpdated();
-        
-        Promise.settle([
-            powerBi.datasetExists('ApicBI'),
+
+        var lastUpdated = stateHandler.getLastUpdated();
+
+        var promises = [
+            stateHandler.getDataset('ApicBI', powerBi, attempt > 0),
             getQuery(lastUpdated)
-        ])
+        ];
+
+        Promise.settle(promises)
         .then(function (data) {
             return pushData(data, powerBi, lastUpdated);
         })
