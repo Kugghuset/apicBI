@@ -97,10 +97,10 @@ function pushData(data, powerBi, lastUpdated) {
         }).pop();
 
         var todayOnly;
-
+        
         // Check if the date is the very same as the start of this week
         // this should only work on first boot.
-        if (lastUpdated === moment().startOf('week').valueOf()) {
+        if (lastUpdated === moment().startOf('isoweek').valueOf()) {
             todayOnly = _.chain(recordset)
                 .filter(function (item) { return moment().startOf('day').isBefore(item.TerminatedDateTimeGMT); })
                 .map(function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); })

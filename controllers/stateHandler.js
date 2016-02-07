@@ -122,7 +122,7 @@ function getLastUpdated(filepath) {
     
     return !!(lastUpdated && lastUpdated.timestamp)
         ? lastUpdated.timestamp
-        : moment().startOf('week').valueOf();
+        : moment().startOf('isoweek').valueOf();
 }
 
 /**
