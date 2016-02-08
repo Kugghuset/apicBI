@@ -67,60 +67,19 @@ function saveTimeStamp(filepath, latest) {
 }
 
 /**
+ * Saves the latest timestamp and pushes the data to PowerBI.
+ * 
  * @param {Array} data
  * @param {Object} powerBi
+ * @return {Promise} -> {Object}
  */
-function pushData(data, powerBi, lastUpdated) {
+function pushData(data, datasetId, powerBi, attempt) {
     return new Promise(function (resolve, reject) {
         
-        // Get the datasetId from the response object
-        var datasetId = _.attempt(function () { return data[0].value().dataset.id });
-        if (_.isError(datasetId)) {
-            // return early, do something about it?
-            console.log('Could not get datasetId');
-            return reject(new Error('Could not get datasetId.'));
-        }
-        
-        // Get the recordset
-        var recordset = _.attempt(function () { return data[1].value(); });
-        if (_.isError(recordset)) {
-            console.log('Could not get recordset from the database.');
-            return reject(new Error('Could not get recordset from the database'));
-        }
-
-        // Filter out any incorrect items.
-        recordset = _.filter(recordset, function (item) { return item && item.TerminatedDateTimeGMT; });
-
-        // Get the latest value from the table, if any
-        var latest = _.map(recordset).sort(function (a, b) {
-            return moment(a.TerminatedDateTimeGMT).isAfter(b.TerminatedDateTimeGMT);
-        }).pop();
-
-        var todayOnly;
-        
-        // Check if the date is the very same as the start of this week
-        // this should only work on first boot.
-        if (lastUpdated === moment().startOf('isoweek').valueOf()) {
-            todayOnly = _.chain(recordset)
-                .filter(function (item) { return moment().startOf('day').isBefore(item.TerminatedDateTimeGMT); })
-                .map(function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); })
-                .value();
-        } else {
-            todayOnly = _.map(recordset, function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); });
-        }
-
-        // Remove the property TerminatedDateTimeGMT from all items.
-        recordset = _.map(recordset, function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); });
-
-        // recordset will allways be the same or greater than todayOnly, so it's valid to only check it's length;
-        if (recordset && recordset.length) {
-            console.log('New data found at: ' + moment().format('YYYY-MM-DD HH:mm') + '!');
-        }
-
         // Save the timestamp for future use, if there is one
-        saveTimeStamp(filepath, latest);
-
-        var promises = _.map({ day: todayOnly, week: recordset }, function (value, key) {
+        saveTimeStamp(filepath, data.latest);
+        
+        var promises = _.map({ day: data.todayOnly, week: data.recordset }, function (value, key) {
             return new Promise(function (resolve, reject) {
                 
                 // Only make the request if there's been an update.
@@ -145,6 +104,53 @@ function pushData(data, powerBi, lastUpdated) {
         })
         .catch(reject);
     });
+}
+
+/**
+ * Cleans the recordsets and returns an object
+ * containing the the complete *recordset*, a (possible) subset at *todayOnly* and the *latest*.
+ * If no data is found, an empty object is returned instead.
+ * 
+ * @param {Array} recordset
+ * @param {Object} lastUpdated
+ * @return {Object} { recordset: {Array}, todayOnly: {Array}, latest: {Object} }
+ */
+function cleanDataset(recordset, lastUpdated) {
+    
+    // Filter out any incorrect items.
+    recordset = _.filter(recordset, function (item) { return item && item.TerminatedDateTimeGMT; });
+
+    // Get the latest value from the table, if any
+    var latest = _.map(recordset).sort(function (a, b) {
+        return moment(a.TerminatedDateTimeGMT).isAfter(b.TerminatedDateTimeGMT);
+    }).pop();
+
+    var todayOnly;
+
+    // Check if the date is the very same as the start of this week
+    // this should only work on first boot.
+    if (lastUpdated === moment().startOf('week').valueOf()) {
+        todayOnly = _.chain(recordset)
+            .filter(function (item) { return moment().startOf('day').isBefore(item.TerminatedDateTimeGMT); })
+            .map(function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); })
+            .value();
+    } else {
+        todayOnly = _.map(recordset, function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); });
+    }
+
+    // Remove the property TerminatedDateTimeGMT from all items.
+    recordset = _.map(recordset, function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); });
+
+    // recordset will allways be the same or greater than todayOnly, so it's valid to only check it's length;
+    if (recordset && recordset.length) {
+        console.log('New data found at: ' + moment().format('YYYY-MM-DD HH:mm') + '!');
+        
+        // Resolve the various recordsets
+        return { recordset: recordset, todayOnly: todayOnly, latest: latest };
+    } else {
+        // Resolve an empty object instead
+        return {};
+    }
 }
 
 /**
@@ -187,39 +193,54 @@ function notifyError(err) {
  */
 DB2BI.read = function read(attempt) {
 
+    // Setup for possible recursion
     if (_.isUndefined(attempt)) { attempt = 0; }
 
     if (attempt > 10) {
 
+        // Too many attempts!
         notifyThreshold(attempt);
-
+        
         return console.log('Failed too many times.');
     }
-
-    stateHandler.getToken(attempt > 0)
+    
+    var lastUpdated = stateHandler.getLastUpdated();
+    var data;
+    var powerBi;
+    
+    // Get get the data
+    getQuery(lastUpdated)
+    .then(function (recordset) {
+        data = cleanDataset(recordset, lastUpdated);
+        
+        // No data found, nothing to push. Return early
+        if (!data.recordset) {
+            return;
+        }
+        
+        // Get the token for pushing
+        return stateHandler.getToken(attempt > 0);
+    })
     .then(function (token) {
-        var powerBi = new PowerBi(token);
-
-        var lastUpdated = stateHandler.getLastUpdated();
-
-        var promises = [
-            stateHandler.getDataset('ApicBI', powerBi, attempt > 0),
-            getQuery(lastUpdated)
-        ];
-
-        Promise.settle(promises)
-        .then(function (data) {
-            return pushData(data, powerBi, lastUpdated);
-        })
-        .catch(function (err) {
-            if (/(not exists|get datasetid)/i.test(err)) {
-                return read(attempt += 1);
-            } else {
-                notifyError(err);
-                console.log(err);
-            }
-        });
-
+        
+        powerBi = new PowerBi(token);
+        
+        // Get the datasetId
+        return stateHandler.getDataset('ApicBI', powerBi, attempt > 0);
+        
+    })
+    .then(function (datasetId) {
+        
+        // Push the data
+        return pushData(data, datasetId, powerBi, attempt);
+    })
+    .catch(function (err) {
+        if (/(not exists|get datasetid)/i.test(err)) {
+            return read(attempt += 1);
+        } else {
+            notifyError(err);
+            console.log(err);
+        }
     });
 };
 
