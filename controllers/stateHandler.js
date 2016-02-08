@@ -1,247 +1,247 @@
-var Promise = require('bluebird');
-var AzureAuth = require('../lib/azureAuth');
-var PowerBi = require('../lib/powerBi');
-var sql = require("seriate");
+
 var fs = require('fs');
 var path = require('path');
 var moment = require('moment');
 var _ = require('lodash');
 
-var database = require('../configs/database');
-var stateHandler = require('./stateHandler');
-var mail = require('../lib/mail');
-
-// Init only needed once
-sql.setDefaultConfig(database.ic);
-
-// Filapath to the storage file
-var filepath = path.resolve('assets/lastUpdated.json');
-
-var tokenPath = path.resolve('assets/token.json');
-
-// Old filepath for migration if it exists
-var old_filepath = path.resolve('assets/lastUpdated.txt');
+var AzureAuth = require('../lib/azureAuth');
+var PowerBi = require('../lib/powerBi');
 
 /**
- * Will run on startup and should really only run once.
- */
-stateHandler.migrateTxtToJson(old_filepath, filepath);
-
-function DB2BI() {}
-
-/**
- * Gets new rows since *lastUpdated* from DB.
+ * Reads the filecontents and returns an object containing it.
  * 
- * @param {Date} lastUpdated
- * @retunrn {Promise} -> {Array}
+ * @param {string} filepath Relative or absolute path to file
+ * @return {object} If file exists, the file contents, otherwise an empty object
  */
-function getQuery(lastUpdated) {
-    return sql.execute({
-        query: sql.fromFile('../sql/polling_agents.sql'),
-        params: {
-            LastUpdate: {
-                type: sql.DATETIME2,
-                val: new Date(lastUpdated)
-            }
-        }
-    });
-}
-
-/**
- * Writes to *filepath* the timestamp of *latest* if it exists.
- * 
- * @param {Object} latest
- * @return {Boolean}
- */
-function saveTimeStamp(filepath, latest) {
+function readJsonFile(_filepath) {
     
-    if (!filepath) { return; }
-    // Save the timestamp for future use, if there is one
-    if (latest && latest.TerminatedDateTimeGMT) {
-        var timestamp = latest.TerminatedDateTimeGMT.getTime() + 5;
-        console.log('Writing new timestamp: ' + timestamp + ', which is: ' + moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS'));
-        stateHandler.writeJsonFile(filepath, { timestamp: timestamp, timeString: moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS') });
-        return true;
-    }
-    return false;
-}
-
-/**
- * Saves the latest timestamp and pushes the data to PowerBI.
- * 
- * @param {Array} data
- * @param {Object} powerBi
- * @return {Promise} -> {Object}
- */
-function pushData(data, datasetId, powerBi, attempt) {
-    return new Promise(function (resolve, reject) {
-        
-        // Save the timestamp for future use, if there is one
-        saveTimeStamp(filepath, data.latest);
-        
-        var promises = _.map({ day: data.todayOnly, week: data.recordset }, function (value, key) {
-            return new Promise(function (resolve, reject) {
-                
-                // Only make the request if there's been an update.
-                if (value && value.length) {
-                    
-                    // Table names will be be prefixed with 'day_' or 'week_'
-                    powerBi.addRows(datasetId, [key, 'per_agent'].join('_'), value).then(function (result) {
-                        console.log([key, 'per_agent'].join('_') + ' sent ' + value.length + ' rows. ' + moment().format('YYYY-MM-DD HH:mm'));
-                        resolve(result);
-                    }).catch(reject);
-
-                } else {
-                    resolve({});
-                }
-            });
-        });
-        
-        // Iterate over data for the current day and the current week
-        Promise.all(_.map(promises, function (promise) { return promise.reflect(); }))
-        .then(function (data) {
-            resolve(_.map(data, function (val) { return val.value(); }));
-        })
-        .catch(reject);
-    });
-}
-
-/**
- * Cleans the recordsets and returns an object
- * containing the the complete *recordset*, a (possible) subset at *todayOnly* and the *latest*.
- * If no data is found, an empty object is returned instead.
- * 
- * @param {Array} recordset
- * @param {Object} lastUpdated
- * @return {Object} { recordset: {Array}, todayOnly: {Array}, latest: {Object} }
- */
-function cleanDataset(recordset, lastUpdated) {
+    // Normalize the filepath
+    var _path = path.resolve(_filepath);
     
-    // Filter out any incorrect items.
-    recordset = _.filter(recordset, function (item) { return item && item.TerminatedDateTimeGMT; });
-
-    // Get the latest value from the table, if any
-    var latest = _.map(recordset).sort(function (a, b) {
-        return moment(a.TerminatedDateTimeGMT).isAfter(b.TerminatedDateTimeGMT);
-    }).pop();
-
-    var todayOnly;
-
-    // Check if the date is the very same as the start of this week
-    // this should only work on first boot.
-    if (lastUpdated === moment().startOf('week').valueOf()) {
-        todayOnly = _.chain(recordset)
-            .filter(function (item) { return moment().startOf('day').isBefore(item.TerminatedDateTimeGMT); })
-            .map(function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); })
-            .value();
-    } else {
-        todayOnly = _.map(recordset, function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); });
-    }
-
-    // Remove the property TerminatedDateTimeGMT from all items.
-    recordset = _.map(recordset, function (row) { return _.omit(row, 'TerminatedDateTimeGMT'); });
-
-    // recordset will allways be the same or greater than todayOnly, so it's valid to only check it's length;
-    if (recordset && recordset.length) {
-        console.log('New data found at: ' + moment().format('YYYY-MM-DD HH:mm') + '!');
+    // Check the file exists
+    if (fs.existsSync(_path)) {
+        var fileContents = fs.readFileSync(_path, 'utf8');
         
-        // Resolve the various recordsets
-        return { recordset: recordset, todayOnly: todayOnly, latest: latest };
+        var parsed = _.attempt(function () { return JSON.parse(fileContents); });
+        return _.isError(parsed)
+            ? { data: fileContents }
+            : parsed;
     } else {
-        // Resolve an empty object instead
         return {};
     }
+  
 }
 
 /**
- * @param {number} attempt
- * @return {promise}
+ * Writes the object to a file.
+ * 
+ * @param {object} content Data
+ * @return {Boolean}
  */
-function notifyThreshold(attempt) {
+function writeJsonFile(_filepath, content) {
     
-    return mail.send('Too many attempts have been made.', [
-        'Hello, we have made to many attempts at pushing data to Power BI.',
-        'Number of attmepts: ' + attempt,
-        '',
-        'Best wishes,',
-        'The real time dashboard crew'
-    ].join('\n'));
-  
-}
-
-/**
- * @param {error} err
- * @return {promise}
- */
-function notifyError(err) {
-  
-    return mail.send('An error occured', [
-        'Hello, the following error occured when trying to push data to Powe B:',
-        err,
-        '',
-        'Best wishes,',
-        'The real time dashboard crew'
-    ].join('\n'));
-  
-}
-
-/**
- * Reads the DB and pushes the data to Power BI.
- * 
- * 
- * @param {number} attempt Set recursevly, DO NOT SET!
- */
-DB2BI.read = function read(attempt) {
-
-    // Setup for possible recursion
-    if (_.isUndefined(attempt)) { attempt = 0; }
-
-    if (attempt > 10) {
-
-        // Too many attempts!
-        notifyThreshold(attempt);
-        
-        return console.log('Failed too many times.');
+    // No content or filepath means trouble.
+    if (!_filepath || !content) {
+        return false;
     }
     
-    var lastUpdated = stateHandler.getLastUpdated();
-    var data;
-    var powerBi;
+    // Normalize the filepath.
+    var _path = path.resolve(_filepath);
     
-    // Get get the data
-    getQuery(lastUpdated)
-    .then(function (recordset) {
-        data = cleanDataset(recordset, lastUpdated);
+    var data;
+    var parsed = _.attempt(function () { return JSON.parse(content); })
+    
+    // Check if *content* is a JSON object
+    if (_.isError(parsed)) {
+        // Content is not a JSON object
         
-        // No data found, nothing to push. Return early
-        if (!data.recordset) {
-            return;
+        // Try stringify it
+        data = _.attempt(function () {
+            return JSON.stringify(content);
+        });
+        
+        // If something went wrong, stringify an object with the property data set to *content*.
+        if (_.isError(data)) {
+            data = JSON.stringify({ data: content });
         }
-        
-        // Get the token for pushing
-        return stateHandler.getToken(attempt > 0);
-    })
-    .then(function (token) {
-        
-        powerBi = new PowerBi(token);
-        
-        // Get the datasetId
-        return stateHandler.getDataset('ApicBI', powerBi, attempt > 0);
-        
-    })
-    .then(function (datasetId) {
-        
-        // Push the data
-        return pushData(data, datasetId, powerBi, attempt);
-    })
-    .catch(function (err) {
-        if (/(not exists|get datasetid)/i.test(err)) {
-            return read(attempt += 1);
-        } else {
-            notifyError(err);
-            console.log(err);
-        }
-    });
-};
+    } else {
+        // Content already is a JSON object
+        data = content;
+    }
+    
+    // Write the file
+    fs.writeFileSync(_path, data);
+    
+    return true;
+}
 
-module.exports = DB2BI;
+/**
+ * Migrates the old timestamp .txt file to a new .json file.
+ * This will delete the old file completely.
+ * 
+ * @param {string} txtPath Relative or absolute file path to the .txt timestamp file
+ * @param {string} jsonPath Relative or absolute file path to the .json timestamp file
+ */
+function migrateTxtToJson(txtPath, jsonPath) {
+    
+    // Normalize the filepath
+    var _txtPath = path.resolve(txtPath);
+    
+    var timestamp = fs.existsSync(_txtPath)
+        ? parseInt(fs.readFileSync(_txtPath, 'utf8'))
+        : undefined;
+    
+    if (timestamp) {
+        
+        // Write to the new file.
+        console.log('Migrating .txt timestamp file: ' + _txtPath);
+        writeJsonFile(jsonPath, { timestamp: timestamp, timeString: moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS') });
+        
+        // Delete the old file as it's unnecessary
+        fs.unlinkSync(_txtPath);
+        console.log('.txt file deleted: ' + _txtPath);
+    }
+    
+}
+
+/**
+ * Returns the timestamp from *filepath*
+ * or the start of the current week.
+ * 
+ * @param {string} filepath
+ * @return {date}
+ */
+function getLastUpdated(filepath) {
+    
+    // Either use *filepath* as is, or set it to the lastUpdated.json file in assets
+    filepath = !_.isUndefined(filepath)
+        ? filepath
+        : path.resolve(__dirname, '../assets/lastUpdated.json');
+    
+    var lastUpdated = readJsonFile(filepath);
+    
+    return !!(lastUpdated && lastUpdated.timestamp)
+        ? lastUpdated.timestamp
+        : moment().startOf('week').valueOf();
+}
+
+/**
+ * Returns a promise of the token to use
+ * for making requests to Power BI.
+ * 
+ * Gets a new token from Azure if none can be found locally or *getNew* is true,
+ * otherwise it will try to find get the local tocak at *filePath* or in the assets folder.
+ * If failed, a new token will be gotten from Azure.
+ * 
+ * @param {string} filepath
+ * @return {promise} -> {string}
+ */
+function getToken(getNew, tokenPath) {
+    return new Promise(function (resolve, reject) {
+        
+        tokenPath = !_.isUndefined(tokenPath)
+            ? tokenPath
+            : path.resolve(__dirname, '../assets/token.json');
+        
+        // for some reason get a new token
+        var data;
+        if (fs.existsSync(tokenPath)) {
+            data = readJsonFile(tokenPath);
+        }
+        
+        if (getNew || !data || !data.token || moment().subtract(50, 'minutes').isAfter(moment(parseInt(data.timestamp)))) {
+            
+            console.log('Fetching new token.');
+            
+            var azure = new AzureAuth();
+
+            azure.getToken()
+            .then(function (data) {
+                console.log('Writing new token at: ' + moment().format('YYYY-MM-DD HH:mm'));
+                writeJsonFile(tokenPath, _.assign({}, data, {
+                    timestamp: Date.now()
+                }));
+                resolve(data.token);
+            })
+            .catch(reject);
+        } else {
+            
+            if (data.token) {
+                resolve(data.token);
+            } else {
+                reject(new Error('No token found.'));
+            }
+        }
+
+    });
+}
+
+/**
+ * Returns a promise of the dataset with its name matching *dataset*.
+ * If a new is fetched, it's stored in the assets folder.
+ * 
+ * @param {string} dataset Name of dataset
+ * @param {object} _powerBi
+ * @param {boolean} getNew
+ * @param {string} datasetPath Path to dataset file
+ * @return {promise} -> {string}
+ */
+function getDataset(datasetName, _powerBi, getNew, datasetPath) {
+    return (function () {
+        return new Promise(function (resolve, reject) {
+            /**
+             * Define powerBi if it's undefined
+             */
+            
+            // If it's defined, resolve it
+            if (!_.isUndefined(_powerBi)) {
+                resolve(_powerBi);
+            }
+            
+            // Get a token and resolve a new instance of PowerBI
+            getToken()
+            .then(function (token) {
+              resolve(new PowerBi(token));
+            })
+            .catch(reject);
+        });
+    })()
+    .then(function (powerBi) {
+        return new Promise(function (resolve, reject) {
+            /**
+             * Get the dataset either from file new
+             */
+            
+            // Set the filepath if it's undefined
+            datasetPath = !_.isUndefined(datasetPath)
+                ? datasetPath
+                : path.resolve(__dirname, '../assets/datasets_{dataset}.json'.replace('{dataset}', datasetName));
+            
+            var datasetInfo = readJsonFile(datasetPath);
+            
+            // If the file doesn't exist, return powerBi.datasetExists(dataset)
+            if (getNew || !datasetInfo.dataset) {
+                return powerBi.datasetExists(datasetName)
+                .then(function (_dataset) {
+                    // Save file to datasetPath
+                    writeJsonFile(datasetPath, _dataset);
+                    
+                    resolve(_dataset.dataset.id);
+                })
+                .catch(reject);
+            }
+            
+            // Resolve the file contents
+            resolve(datasetInfo.dataset.id);
+        });
+    });
+}
+
+module.exports = {
+    readJsonFile: readJsonFile,
+    writeJsonFile: writeJsonFile,
+    migrateTxtToJson: migrateTxtToJson,
+    getLastUpdated: getLastUpdated,
+    getToken: getToken,
+    getDataset: getDataset
+}
