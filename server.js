@@ -10,7 +10,6 @@ var ClearTable = require('./controllers/clearTable');
 var every10Seconds = later.parse.recur()
     .every(10).second();
 
-
 // Schedule which will run at the change och day, every day.
 var everyStartOfDay = later.parse.recur()
     .first().hour();

@@ -27,15 +27,19 @@ var old_filepath = path.resolve('assets/lastUpdated.txt');
  */
 stateHandler.migrateTxtToJson(old_filepath, filepath);
 
-function DB2BI() {}
-
 /**
- * Gets new rows since *lastUpdated* from DB.
+ * Gets new rows since *lastUpdated* from DB,
+ * unless *isDefined* is true, then it returns an empty array.
  * 
  * @param {Date} lastUpdated
+ * @param {Boolean} isDefined
  * @retunrn {Promise} -> {Array}
  */
-function getQuery(lastUpdated) {
+function getQuery(lastUpdated, isDefined) {
+    if (isDefined) {
+        return new Promise(function (resolve, reject) { resolve([]); });
+    }
+    
     return sql.execute({
         query: sql.fromFile('../sql/polling_agents.sql'),
         params: {
@@ -69,15 +73,22 @@ function saveTimeStamp(filepath, latest) {
 /**
  * Saves the latest timestamp and pushes the data to PowerBI.
  * 
- * @param {Array} data
+ * @param {Object} data { recordset: {Array}, todayOnly: {Array}, latest: {Object} }
+ * @param {String} datasetId
  * @param {Object} powerBi
+ * @param {Number} attempt
  * @return {Promise} -> {Object}
  */
 function pushData(data, datasetId, powerBi, attempt) {
     return new Promise(function (resolve, reject) {
         
         // Save the timestamp for future use, if there is one
-        saveTimeStamp(filepath, data.latest);
+        if (attempt === 0) {
+            // Only save the timestamp if it's the first attempt.
+            saveTimeStamp(filepath, data.latest);
+        } else {
+            console.log('Skipping writing timestamp, attempt to send data: ' + attempt);
+        }
         
         var promises = _.map({ day: data.todayOnly, week: data.recordset }, function (value, key) {
             return new Promise(function (resolve, reject) {
@@ -188,10 +199,10 @@ function notifyError(err) {
 /**
  * Reads the DB and pushes the data to Power BI.
  * 
- * 
+ * @param {object} data Set recursevly, DO NOT SET!
  * @param {number} attempt Set recursevly, DO NOT SET!
  */
-DB2BI.read = function read(attempt) {
+function read(data, attempt) {
 
     // Setup for possible recursion
     if (_.isUndefined(attempt)) { attempt = 0; }
@@ -205,13 +216,15 @@ DB2BI.read = function read(attempt) {
     }
     
     var lastUpdated = stateHandler.getLastUpdated();
-    var data;
     var powerBi;
     
     // Get get the data
-    getQuery(lastUpdated)
+    getQuery(lastUpdated, !!data)
     .then(function (recordset) {
-        data = cleanDataset(recordset, lastUpdated);
+        // Only assign data if it's undefined
+        data = !!data
+            ? data
+            : cleanDataset(recordset, lastUpdated);
         
         // No data found, nothing to push. Return early
         if (!data.recordset) {
@@ -235,8 +248,8 @@ DB2BI.read = function read(attempt) {
         return pushData(data, datasetId, powerBi, attempt);
     })
     .catch(function (err) {
-        if (/(not exists|get datasetid)/i.test(err)) {
-            return read(attempt += 1);
+        if (/(not exists|get datasetid|get fulfillment)/i.test(err)) {
+            return read(data, attempt += 1);
         } else {
             notifyError(err);
             console.log(err);
@@ -244,4 +257,6 @@ DB2BI.read = function read(attempt) {
     });
 };
 
-module.exports = DB2BI;
+module.exports = {
+    read: read
+};
