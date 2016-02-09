@@ -133,7 +133,8 @@ function getLastUpdated(filepath) {
  * otherwise it will try to find get the local tocak at *filePath* or in the assets folder.
  * If failed, a new token will be gotten from Azure.
  * 
- * @param {string} filepath
+ * @param {boolean} getNew
+ * @param {string} tokenPath
  * @return {promise} -> {string}
  */
 function getToken(getNew, tokenPath) {
@@ -155,7 +156,7 @@ function getToken(getNew, tokenPath) {
             
             var azure = new AzureAuth();
 
-            azure.getToken()
+            azure.getToken(true)
             .then(function (data) {
                 console.log('Writing new token at: ' + moment().format('YYYY-MM-DD HH:mm'));
                 writeJsonFile(tokenPath, _.assign({}, data, {

@@ -2,13 +2,15 @@
   "name": "apicBI",
   "version": "0.0.2",
   "scripts": {
-    "start": "node server.js",
     "init": "node init.js",
-    "clean": "node clean.js -dataset ApicBI",
     "reinit": "node init.js -dataset ApicBI -reinit 1",
-    "kill_history": "node kill_history.js -filepath assets/lastUpdated.json",
-    "clear_token": "node kill_history.js -filepath assets/token.json",
-    "reset": "npm run clean && npm run reinit && npm run kill_history && npm run clear_token"
+    "clean": "node clean.js -dataset ApicBI",
+    "clear_history": "node clear_file.js -filepath assets/lastUpdated.json",
+    "clear_token": "node clear_file.js -filepath assets/token.json",
+    "clear_dataset": "node clear_file.js -filepath assets/datasets_ApicBI.json",
+    "clear_session": "npm run clear_history && npm run clear_token && npm run clear_dataset",
+    "reset": "npm run clean && npm run reinit && npm run clear_session",
+    "serve": "forever -c node server.js"
   },
   "description": "A communication layer between ICWS and Power BI",
   "main": "index.js",
