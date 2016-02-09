@@ -11,7 +11,8 @@ module.exports = {
                 { name: 'Is under 60', dataType: 'Int64' },
                 { name: 'Nullable waiting time', dataType: 'Int64' },
                 { name: 'Date connected', dataType: 'Datetime' },
-                { name: 'Date disconnected', dataType: 'Datetime' }
+                { name: 'Date disconnected', dataType: 'Datetime' },
+                { name: 'Work group', dataType: 'String' }
             ]
         },
         {
@@ -24,7 +25,8 @@ module.exports = {
                 { name: 'Is under 60', dataType: 'Int64' },
                 { name: 'Nullable waiting time', dataType: 'Int64' },
                 { name: 'Date connected', dataType: 'Datetime' },
-                { name: 'Date disconnected', dataType: 'Datetime' }
+                { name: 'Date disconnected', dataType: 'Datetime' },
+                { name: 'Work group', dataType: 'String' }
             ]
         }
     ]

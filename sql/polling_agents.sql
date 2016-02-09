@@ -23,6 +23,7 @@ WHERE [LocalUserId] != '-'
     AND [ConnectedDate] != '1970-01-01 01:00:00.000'
     AND [ConnectedDate] > @StartOfWeek
     AND [TerminatedDateTimeGMT] > @LastUpdate
+    AND [AssignedWorkGroup] = 'CSA'
 GROUP BY [LocalUserId]
 
 /*
@@ -37,6 +38,7 @@ DECLARE @ThisWeeksCalls TABLE (
   , [TerminatedDate] DateTime2 NULL
   , [TerminatedDateTimeGMT] DateTime2 NULL
   , [tQueueWaitSeconds] Int NULL
+  , [AssignedWorkGroup] nvarchar(100) NULL
 )
 -- Populate @ThisWeeksCalls
 INSERT INTO @ThisWeeksCalls
@@ -46,12 +48,14 @@ SELECT [LocalUserId]
      , [TerminatedDate]
      , [TerminatedDateTimeGMT]
      , [tQueueWait] / 1000
+     , [AssignedWorkGroup]
 FROM [SP_I3_IC].[dbo].[calldetail_viw]
 WHERE [CallDirection] = 'Inbound'
   AND [ConnectedDate] != '1970-01-01 01:00:00.000'
   AND [ConnectedDate] > @StartOfWeek
   AND [TerminatedDateTimeGMT] > @LastUpdate
   AND [CallType] != 'Intercom'
+  AND [AssignedWorkGroup] = 'CSA'
   AND [LocalUserId] IN (SELECT * FROM @ActiveAgents)
 
 /***************************************************************************
@@ -64,27 +68,29 @@ WHERE [CallDirection] = 'Inbound'
  * [Waiting time in seconds]                    The waiting time in seconds
  * [Waiting time in minutes]                    The waiting time in minutes
  * [Is under 60]                                100 or 0 for whether the waiting time is under 60 or not
- * [Nullable waiting time]						The call length if it's below 60, otherwise NULL
+ * [Nullable waiting time]                      The call length if it's below 60, otherwise NULL
  * [Date connected]                             The time of the agent answering
  * [Date disconnected]                          The time of the agent disconnecting the call
  * [TerminatedDateTimeGMT]                      The time of insert of the row
+ * [Work group]                                    Name of the work group which has to be CSA
 ***************************************************************************/
 SELECT [iDetails].[FirstName] + ' ' + [iDetails].[LastName] AS [Agent]
      , [cView].[CallDurationSeconds] AS [Call duration in seconds]
      , CAST(ROUND(([cView].[CallDurationSeconds] + 0.0) / 60, 2) AS Float) AS [Call duration in minutes]
      , [cView].[tQueueWaitSeconds] AS [Waiting time in seconds]
      , CAST(ROUND(([cView].[tQueueWaitSeconds] + 0.0) / 60 , 2) AS Float) AS [Waiting time in minutes]
-	 , CASE
+     , CASE
         WHEN [cView].[tQueueWaitSeconds] < 60 THEN 100
         ELSE 0
       END AS [Is under 60]
-	 , CASE
+     , CASE
         WHEN [cView].[tQueueWaitSeconds] < 60 THEN ([cView].[tQueueWaitSeconds])
         ELSE NULL
       END AS [Nullable waiting time]
      , [cView].[ConnectedDate] AS [Date connected]
      , [cView].[TerminatedDate] AS [Date disconnected]
      , [cView].[TerminatedDateTimeGMT]
+     , [cView].[AssignedWorkGroup] AS [Work group]
 FROM [SP_I3_IC].[dbo].[IndivDetails] AS [iDetails]
 
 /*
@@ -97,6 +103,7 @@ LEFT JOIN (
          , [ConnectedDate]
          , [TerminatedDate]
          , [TerminatedDateTimeGMT]
+         , [AssignedWorkGroup]
     FROM @ThisWeeksCalls
     WHERE [TerminatedDateTimeGMT] > @LastUpdate
     ) AS [cView]
