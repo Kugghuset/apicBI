@@ -1,6 +1,6 @@
 
 -- Will be set in JavaScript
--- DECLARE @LastUpdate DateTime2 = '2016-01-25 00:00'
+--DECLARE @LastUpdate DateTime2 = '2016-01-25 00:00'
 
 
 -- Filter variables
@@ -23,7 +23,7 @@ WHERE [LocalUserId] != '-'
     AND [ConnectedDate] != '1970-01-01 01:00:00.000'
     AND [ConnectedDate] > @StartOfWeek
     AND [TerminatedDateTimeGMT] > @LastUpdate
-    AND [AssignedWorkGroup] = 'CSA'
+    AND NOT [AssignedWorkGroup] IN ('-', 'Test')
 GROUP BY [LocalUserId]
 
 /*
@@ -55,7 +55,7 @@ WHERE [CallDirection] = 'Inbound'
   AND [ConnectedDate] > @StartOfWeek
   AND [TerminatedDateTimeGMT] > @LastUpdate
   AND [CallType] != 'Intercom'
-  AND [AssignedWorkGroup] = 'CSA'
+  AND NOT [AssignedWorkGroup] IN ('-', 'Test')
   AND [LocalUserId] IN (SELECT * FROM @ActiveAgents)
 
 /***************************************************************************
