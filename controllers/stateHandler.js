@@ -238,11 +238,67 @@ function getDataset(datasetName, _powerBi, getNew, datasetPath) {
     });
 }
 
+/**
+ * Stores cookies, token and sessionId used as
+ * authentication to the ICWS server.
+ * 
+ * Returns the stored object.
+ * 
+ * @param {Array} cookies
+ * @param {String} token
+ * @param {String} sessionId
+ * @param {String} icwsPath Not required
+ * @return {Object}
+ */
+function storeICWSAuth(cookies, token, sessionId, icwsPath) {
+    
+    var storable;
+    var args = _.map(arguments);
+    
+    storable = args.length === 1
+        ? {
+            cookies: args.cookies,
+            token: args.token,
+            sessionId: args.sessionId
+        }
+        : {
+            cookies: cookies,
+            token: token,
+            sessionId: sessionId
+        };
+    
+    icwsPath = !_.isUndefined(icwsPath)
+        ? icwsPath
+        : path.resolve('./assets/icws_auth.json');
+    
+    writeJsonFile(icwsPath, storable);
+    
+    return storable;
+}
+
+/**
+ * Returns the stored ICWS auth data stored in storeICWSAuth(...).
+ * 
+ * @param {String} icwsPath Not required
+ * @return {Object}
+ */
+function readICWSAuth(icwsPath) {
+    
+    icwsPath  = !_.isUndefined(icwsPath)
+        ? icwsPath
+        : path.resolve('./assets/icws_auth.json');
+    
+    return readJsonFile(icwsPath);
+    
+}
+
 module.exports = {
     readJsonFile: readJsonFile,
     writeJsonFile: writeJsonFile,
     migrateTxtToJson: migrateTxtToJson,
     getLastUpdated: getLastUpdated,
     getToken: getToken,
-    getDataset: getDataset
+    getDataset: getDataset,
+    storeICWSAuth: storeICWSAuth,
+    readICWSAuth: readICWSAuth
 }
