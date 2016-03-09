@@ -23,6 +23,10 @@ var tokenPath = path.resolve('assets/token.json');
 // Old filepath for migration if it exists
 var old_filepath = path.resolve('assets/lastUpdated.txt');
 
+// Set error notifications variables
+var _errors = [];
+var _lastMail = undefined;
+
 /**
  * Will run on startup and should really only run once.
  */
@@ -172,30 +176,42 @@ function cleanDataset(recordset, lastUpdated) {
 }
 
 /**
- * @param {number} attempt
+ * Notifies the admins about the errors which have occured.
+ * 
  * @return {promise}
  */
-function notifyThreshold(attempt) {
+function notifyErrors() {
     
-    return mail.send('Too many attempts have been made.', [
-        'Hello, we have made to many attempts at pushing data to Power BI.',
-        'Number of attmepts: ' + attempt,
+    // Emails are allowed to be sent with a minimum interval of 15 minutes
+    if (moment().subtract(15, 'minutes').isBefore(_lastMail)) {
+        console.log('Not sending email as there still is time in the mail buffer.');
+    }
+    
+    // Get all errors in a readable manner.
+    var errors = _.map(_errors, function (err) {
+        // Set *_err* either to the error or a stringified version of it.
+        var _err = (_.isError(err))
+            ? err
+            : _.attempt(function () { return JSON.stringify(err, null, 4); });
+        
+        // Either if something went wrong when stringifying it, or if it's an empty object
+        // set _err to err again.
+        if (_err != err && (_.isError(err) || _.isEqual({}, err))) {
+            _err = err;
+        }
+        
+        return _err;
+    });
+    
+    // Empty the _errors array
+    _errors = [];
+    _lastMail = new Date();
+    
+    return mail.send('Real time errors', [
+        'Hello, we could not push data to Power BI.',
+        'The following {num} errors have occured:'.replace('{num}', errors.length),
         '',
-        'Best wishes,',
-        'The real time dashboard crew'
-    ].join('\n'));
-  
-}
-
-/**
- * @param {error} err
- * @return {promise}
- */
-function notifyError(err) {
-  
-    return mail.send('An error occured', [
-        'Hello, the following error occured when trying to push data to Powe B:',
-        err,
+        errors.join('\n---\n'),
         '',
         'Best wishes,',
         'The real time dashboard crew'
@@ -217,7 +233,7 @@ function read(data, attempt) {
     if (attempt >= 10) {
 
         // Too many attempts!
-        notifyThreshold(attempt);
+        notifyErrors();
         
         return console.log('Failed too many times.');
     }
@@ -258,14 +274,12 @@ function read(data, attempt) {
         // Push the data
         return pushData(data, datasetId, powerBi, attempt);
     })
-    .catch(function (err) { 
-        if (/(not exists|get datasetid|get fulfillment)/i.test(err)) {
-            return read(data, attempt += 1);
-        } else {
-            // notifyError(err);
-            return read(data, attempt += 1);
-            console.log(err);
-        }
+    .catch(function (err) {
+        console.log('Pushing an error to the error buffer at {time}'.replace('{time}', moment().format('YYYY-MM-DD HH:mm')));
+        _errors.push(err);
+        
+        // Retry
+        return read(data, attempt += 1);
     });
 };
 
