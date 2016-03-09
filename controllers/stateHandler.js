@@ -4,8 +4,55 @@ var path = require('path');
 var moment = require('moment');
 var _ = require('lodash');
 
-var AzureAuth = require('../lib/azureAuth');
+var azure = require('../lib/azure');
 var PowerBi = require('../lib/powerBi');
+
+var _tokenPath = path.resolve(__dirname, '../assets/token.json');
+
+/**
+ * Saves the token data to file.
+ * 
+ * @param {String} token
+ * @param {String} refreshToken
+ * @param {String|Number} expiresOn
+ * @return {Object}
+ */
+function saveTokenToFile(data) {
+    
+    // Use this to write the file.
+    var _data = _.assign({}, data, {
+        token: data.token,
+        refreshToken: data.refreshToken,
+        expiresOn: _.isDate(data.expiresOn)
+            ? data.expiresOn.getTime()
+            : data.expiresOn
+    });
+    
+    console.log('Writing token file at {time}'.replace('{time}', moment().format('YYYY-MM-DD HH:mm:ss')));
+    
+    writeJsonFile(_tokenPath, _data);
+    
+    return _data;
+}
+
+/**
+ * Sets _auth and _onTokenUpdated in the azure module.
+ */
+function setupTokenData() {
+    // Read the file from disk
+    var data = readJsonFile(_tokenPath);
+    
+    // Only set the token if there's an expiresOn value
+    if (data.expiresOn && data.token) {
+        azure.setTokenData(data.token, data.refreshToken, data.expiresOn);
+    }
+    
+    // Set _onTokenUpdated in the azure module.
+    azure.setOnTokenUpdated(saveTokenToFile);
+}
+
+// Call it emidiately for setup
+setupTokenData();
 
 /**
  * Reads the filecontents and returns an object containing it.
@@ -125,57 +172,6 @@ function getLastUpdated(filepath) {
         : moment().startOf('week').valueOf();
 }
 
-/**
- * Returns a promise of the token to use
- * for making requests to Power BI.
- * 
- * Gets a new token from Azure if none can be found locally or *getNew* is true,
- * otherwise it will try to find get the local tocak at *filePath* or in the assets folder.
- * If failed, a new token will be gotten from Azure.
- * 
- * @param {boolean} getNew
- * @param {string} tokenPath
- * @return {promise} -> {string}
- */
-function getToken(getNew, tokenPath) {
-    return new Promise(function (resolve, reject) {
-        
-        tokenPath = !_.isUndefined(tokenPath)
-            ? tokenPath
-            : path.resolve(__dirname, '../assets/token.json');
-        
-        // for some reason get a new token
-        var data;
-        if (fs.existsSync(tokenPath)) {
-            data = readJsonFile(tokenPath);
-        }
-        
-        if (getNew || !data || !data.token || moment().subtract(50, 'minutes').isAfter(moment(parseInt(data.timestamp)))) {
-            
-            console.log('Fetching new token.');
-            
-            var azure = new AzureAuth();
-
-            azure.getToken(true)
-            .then(function (data) {
-                console.log('Writing new token at: ' + moment().format('YYYY-MM-DD HH:mm'));
-                writeJsonFile(tokenPath, _.assign({}, data, {
-                    timestamp: Date.now()
-                }));
-                resolve(data.token);
-            })
-            .catch(reject);
-        } else {
-            
-            if (data.token) {
-                resolve(data.token);
-            } else {
-                reject(new Error('No token found.'));
-            }
-        }
-
-    });
-}
 
 /**
  * Returns a promise of the dataset with its name matching *dataset*.
@@ -297,7 +293,6 @@ module.exports = {
     writeJsonFile: writeJsonFile,
     migrateTxtToJson: migrateTxtToJson,
     getLastUpdated: getLastUpdated,
-    getToken: getToken,
     getDataset: getDataset,
     storeICWSAuth: storeICWSAuth,
     readICWSAuth: readICWSAuth

@@ -9,6 +9,7 @@ var _ = require('lodash');
 
 var database = require('../configs/database');
 var stateHandler = require('./stateHandler');
+var azure = require('../lib/azure');
 var mail = require('../lib/mail');
 
 // Init only needed once
@@ -207,7 +208,7 @@ function read(data, attempt) {
     // Setup for possible recursion
     if (_.isUndefined(attempt)) { attempt = 0; }
 
-    if (attempt > 10) {
+    if (attempt >= 10) {
 
         // Too many attempts!
         notifyThreshold(attempt);
@@ -231,8 +232,12 @@ function read(data, attempt) {
             return;
         }
         
+        var _method = (attempt > 0)
+            ? 'refresh'
+            : 'local';
+        
         // Get the token for pushing
-        return stateHandler.getToken(attempt > 0);
+        return azure.getToken(_method);
     })
     .then(function (token) {
         
