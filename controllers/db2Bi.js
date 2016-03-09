@@ -112,7 +112,13 @@ function pushData(data, datasetId, powerBi, attempt) {
         // Iterate over data for the current day and the current week
         Promise.all(_.map(promises, function (promise) { return promise.reflect(); }))
         .then(function (data) {
-            resolve(_.map(data, function (val) { return val.value(); }));
+            if (_.some(data, function (val) { return val.isRejected(); })) {
+                reject(_.map(data, function (val) {
+                    return val.isRejected() ? val.reason() : val.value();
+                }));
+            } else {
+                resolve(_.map(data, function (val) { return val.value(); }));   
+            }
         })
         .catch(reject);
     });
@@ -252,11 +258,12 @@ function read(data, attempt) {
         // Push the data
         return pushData(data, datasetId, powerBi, attempt);
     })
-    .catch(function (err) {
+    .catch(function (err) { 
         if (/(not exists|get datasetid|get fulfillment)/i.test(err)) {
             return read(data, attempt += 1);
         } else {
-            notifyError(err);
+            // notifyError(err);
+            return read(data, attempt += 1);
             console.log(err);
         }
     });
