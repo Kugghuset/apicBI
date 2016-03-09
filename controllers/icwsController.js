@@ -39,10 +39,12 @@ function poll() {
             // Combine the added users with the existing users
             _users = _.uniq(_users.concat(modifiedUsers.added));
             
+            console.log('There are now {num} users.'.replace('{num}', _users.length));
+            
             // Update or create the queue subscription
-            userStatusSub('subscribe', _users)
+            queueSub('subscribe', 'kugghuset-1', _users)
             .catch(function (res) { console.log(res) })
-            dataArr = _.filter(dataArr, function (data) { return _.get(data, '__type') != 'urn:inin.com:configuration.people:usersMessage' });
+            // dataArr = _.filter(dataArr, function (data) { return _.get(data, '__type') != 'urn:inin.com:configuration.people:usersMessage' });
         }
         
         var statusUpdates = _.find(dataArr, function (data) { return _.get(data, '__type') === 'urn:inin.com:status:userStatusMessage'; });
@@ -98,10 +100,12 @@ function userSub(action, subId) {
     
     subId = !_.isUndefined(subId)
         ? subId
-        : 'kugguset-1';
+        : 'kugghuset-1';
     
     var path = 'messaging/subscriptions/configuration/users/:id'
         .replace(':id', subId);
+    
+    console.log('Subscribing to configurations/users');
     
     return /unsub/i.test(action)
         ? unsubscribe(path)
@@ -112,7 +116,10 @@ function userSub(action, subId) {
             properties: [
                 'personalInformationProperties.emailAddress',
                 'personalInformationProperties.givenName',
-                'personalInformationProperties.surname'
+                'personalInformationProperties.surname',
+                'clientConfigDateLastModified',
+                'lastModifiedDate',
+                'statusText'
             ],
             rightsFilter: 'view'
         });
@@ -131,7 +138,7 @@ function workStationSub(action, subId) {
     
     subId = !_.isUndefined(subId)
         ? subId
-        : 'kugguset-1';
+        : 'kugghuset-1';
     
     var path = 'messaging/subscriptions/configuration/workgroups/:id'
         .replace(':id', subId)
@@ -170,14 +177,16 @@ function userStatusSub(action, _users) {
         ? unsubscribe(subPath)
         : subscribe(subPath, {
             userIds: _.flatten(_users),
-            userStatusProperties: [
-                'personalInformationProperties.companyName',
-                'personalInformationProperties.country',
-                'personalInformationProperties.departmentName',
-                'personalInformationProperties.emailAddress',
-                'personalInformationProperties.givenName',
-                'personalInformationProperties.surname'
-            ]
+            rightsFilter: 'view',
+            // userStatusProperties: [
+            //     'personalInformationProperties.companyName',
+            //     'personalInformationProperties.country',
+            //     'personalInformationProperties.departmentName',
+            //     'personalInformationProperties.emailAddress',
+            //     'personalInformationProperties.givenName',
+            //     'personalInformationProperties.surname',
+            //     'statusText'
+            // ]
         });
 }
 
@@ -195,7 +204,7 @@ function queueSub(action, subId, _users) {
     
     subId = !_.isUndefined(subId)
         ? subId
-        : 'kugguset-1';
+        : 'kugghuset-1';
     
     var queueIds = _.map(_users, function (user) { return { queueType: 1, queueName: user }; })
     
@@ -209,7 +218,10 @@ function queueSub(action, subId, _users) {
             queueIds: queueIds,
             attributeNames: [
                 'Eic_State',
-                'Eic_ConnectDurationTime'
+                'Eic_ConnectDurationTime',
+                'Eic_CallId',
+                'Eic_RemoteName',
+                'Eic_RemoteTn'
             ],
             
             rightsFilter: 'view'
@@ -245,7 +257,7 @@ function updateUserStatuses(userIds) {
         
         var users = _.map(data, function (val) { return val.isRejected() ? val.reason() : (val.value() || {}).body; });
         
-        _.chain(users)
+        _usersByState = _.chain(users)
             .map(function (user) {
                 return {
                     id: _.get(user, 'configurationId.id'),
@@ -256,9 +268,6 @@ function updateUserStatuses(userIds) {
                 };
             })
             .groupBy('status')
-            .tap(function (items) {
-                console.log(JSON.stringify(items, null, 4));
-            })
             .value();
         
     })
@@ -296,12 +305,10 @@ function init() {
 function setupSubscriptions() {
     return new Promise(function (resolve, reject) {
         
-        var promises = [ userSub('subscribe', 'kugguset-1'), workStationSub('subscribe', 'kugguset-1') ];
+        var promises = [ userSub('subscribe', 'kugghuset-1'), workStationSub('subscribe', 'kugghuset-1') ];
         
         Promise.all(_.map(promises, function (promise) { return promise.reflect(); }))
         .then(function (data) {
-            
-            // console.log(_.map(data, function (val) { return val.isRejected() ? val.reason() : val.value(); }));
             
             resolve(_.map(data, function (val) { return val.isRejected() ? undefined : val.value(); }))
         });
@@ -364,15 +371,44 @@ function run() {
     return new Promise(function (resolve, reject) {
         
         init()
-        .then(setupSubscriptions)
+        .then(function () {
+          
+          return _icws.put('messaging/subscriptions/statistics/statistic-values', {
+              statisticKeys: [
+                {
+                    statisticIdentifier: 'inin.optimizerrtadata:OptimizerCurrentStatus',
+                    parameterValueItems: [
+                        {
+                            parameterTypeId: 'ININ.OptimizerRTAData:OptimizerSchedulingUnit',
+                            value: ''
+                        },
+                        {
+                            parameterTypeId: 'ININ.OptimizerRTAData:OptimizerWorkgroup',
+                            value: ''
+                        },
+                        {
+                            parameterTypeId: 'ININ.OptimizerRTAData:OptimizerAdherenceStatus',
+                            value: ''
+                        },
+                        {
+                            parameterTypeId: 'ININ.OptimizerRTAData:OptimizerExceptionType',
+                            value: ''
+                        },
+                        {
+                            parameterTypeId: 'ININ.OptimizerRTAData:OptimizerAgent',
+                            value: ''
+                        },
+                    ],
+                    rightsFilter: 'view'
+                }  
+              ]
+          })
+          
+        })
+        // .then(setupSubscriptions)
         .then(function (data) {
             
             startPolling();
-            
-            // _icws.get('configuration/defaults/queue-column')
-            // .then(function (res) {
-            //   console.log(res.body);
-            // })
             
             resolve(_icws);
         })
