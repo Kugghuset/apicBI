@@ -1,7 +1,7 @@
 # apicBI
 A communication layer between ICWS and Power BI
 
-## Scripts`
+## Scripts
 
 ### `npm run init`
 Initializes the dataset in Power BI
@@ -50,6 +50,13 @@ npm run clear_history && npm run clear_token && npm run clear_dataset
 ```
 
 ### `npm run reset`
+Does a complete reset of the application, where datasets are initialized
+and state files are deleted.
+```bash
+npm run clean && npm run init && npm run clear_session
+```
+
+### `npm run hard_reset`
 Does a complete reset of the application, where datasets are reinitialized
 and state files are deleted.
 ```bash
