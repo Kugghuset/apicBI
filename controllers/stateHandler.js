@@ -196,7 +196,7 @@ function getDataset(datasetName, _powerBi, getNew, datasetPath) {
             }
 
             // Get a token and resolve a new instance of PowerBI
-            azure.getToken()
+            azure.getToken('local')
             .then(function(token) {
                 resolve(new PowerBi(token));
             })
