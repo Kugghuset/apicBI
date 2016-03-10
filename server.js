@@ -5,7 +5,6 @@ env('./.env');
 var DB2BI = require('./controllers/db2bi');
 var ClearTable = require('./controllers/clearTable');
 
-
 // Schedule which will run every 10 seconds
 var every10Seconds = later.parse.recur()
     .every(10).second();
@@ -22,6 +21,8 @@ var everyStartOfWeek = later.parse.recur()
 console.log('Running schedules, waiting for updates...');
 // Regular update
 later.setInterval(DB2BI.read, every10Seconds);
+// Instantly call the read method
+DB2BI.read();
 
 // Daily clearing of the daily table
 later.setInterval(function () {

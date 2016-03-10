@@ -185,6 +185,9 @@ function notifyErrors() {
     // Emails are allowed to be sent with a minimum interval of 15 minutes
     if (moment().subtract(15, 'minutes').isBefore(_lastMail)) {
         console.log('Not sending email as there still is time in the mail buffer.');
+        
+        // Return early as no mails should be sent yet.
+        return;
     }
     
     // Get all errors in a readable manner.

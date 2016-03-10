@@ -18,7 +18,7 @@ var _tokenPath = path.resolve(__dirname, '../assets/token.json');
  * @return {Object}
  */
 function saveTokenToFile(data) {
-    
+
     // Use this to write the file.
     var _data = _.assign({}, data, {
         token: data.token,
@@ -27,11 +27,11 @@ function saveTokenToFile(data) {
             ? data.expiresOn.getTime()
             : data.expiresOn
     });
-    
+
     console.log('Writing token file at {time}'.replace('{time}', moment().format('YYYY-MM-DD HH:mm:ss')));
-    
+
     writeJsonFile(_tokenPath, _data);
-    
+
     return _data;
 }
 
@@ -41,12 +41,12 @@ function saveTokenToFile(data) {
 function setupTokenData() {
     // Read the file from disk
     var data = readJsonFile(_tokenPath);
-    
+
     // Only set the token if there's an expiresOn value
     if (data.expiresOn && data.token) {
         azure.setTokenData(data.token, data.refreshToken, data.expiresOn);
     }
-    
+
     // Set _onTokenUpdated in the azure module.
     azure.setOnTokenUpdated(saveTokenToFile);
 }
@@ -61,22 +61,22 @@ setupTokenData();
  * @return {object} If file exists, the file contents, otherwise an empty object
  */
 function readJsonFile(_filepath) {
-    
+
     // Normalize the filepath
     var _path = path.resolve(_filepath);
-    
+
     // Check the file exists
     if (fs.existsSync(_path)) {
         var fileContents = fs.readFileSync(_path, 'utf8');
-        
-        var parsed = _.attempt(function () { return JSON.parse(fileContents); });
+
+        var parsed = _.attempt(function() { return JSON.parse(fileContents); });
         return _.isError(parsed)
             ? { data: fileContents }
             : parsed;
     } else {
         return {};
     }
-  
+
 }
 
 /**
@@ -86,27 +86,27 @@ function readJsonFile(_filepath) {
  * @return {Boolean}
  */
 function writeJsonFile(_filepath, content) {
-    
+
     // No content or filepath means trouble.
     if (!_filepath || !content) {
         return false;
     }
-    
+
     // Normalize the filepath.
     var _path = path.resolve(_filepath);
-    
+
     var data;
-    var parsed = _.attempt(function () { return JSON.parse(content); })
-    
+    var parsed = _.attempt(function() { return JSON.parse(content); })
+
     // Check if *content* is a JSON object
     if (_.isError(parsed)) {
         // Content is not a JSON object
-        
+
         // Try stringify it
-        data = _.attempt(function () {
+        data = _.attempt(function() {
             return JSON.stringify(content);
         });
-        
+
         // If something went wrong, stringify an object with the property data set to *content*.
         if (_.isError(data)) {
             data = JSON.stringify({ data: content });
@@ -115,10 +115,10 @@ function writeJsonFile(_filepath, content) {
         // Content already is a JSON object
         data = content;
     }
-    
+
     // Write the file
     fs.writeFileSync(_path, data);
-    
+
     return true;
 }
 
@@ -130,25 +130,25 @@ function writeJsonFile(_filepath, content) {
  * @param {string} jsonPath Relative or absolute file path to the .json timestamp file
  */
 function migrateTxtToJson(txtPath, jsonPath) {
-    
+
     // Normalize the filepath
     var _txtPath = path.resolve(txtPath);
-    
+
     var timestamp = fs.existsSync(_txtPath)
         ? parseInt(fs.readFileSync(_txtPath, 'utf8'))
         : undefined;
-    
+
     if (timestamp) {
-        
+
         // Write to the new file.
         console.log('Migrating .txt timestamp file: ' + _txtPath);
         writeJsonFile(jsonPath, { timestamp: timestamp, timeString: moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS') });
-        
+
         // Delete the old file as it's unnecessary
         fs.unlinkSync(_txtPath);
         console.log('.txt file deleted: ' + _txtPath);
     }
-    
+
 }
 
 /**
@@ -159,14 +159,14 @@ function migrateTxtToJson(txtPath, jsonPath) {
  * @return {date}
  */
 function getLastUpdated(filepath) {
-    
+
     // Either use *filepath* as is, or set it to the lastUpdated.json file in assets
     filepath = !_.isUndefined(filepath)
         ? filepath
         : path.resolve(__dirname, '../assets/lastUpdated.json');
-    
+
     var lastUpdated = readJsonFile(filepath);
-    
+
     return !!(lastUpdated && lastUpdated.timestamp)
         ? lastUpdated.timestamp
         : moment().startOf('week').valueOf();
@@ -184,50 +184,50 @@ function getLastUpdated(filepath) {
  * @return {promise} -> {string}
  */
 function getDataset(datasetName, _powerBi, getNew, datasetPath) {
-    return (function () {
-        return new Promise(function (resolve, reject) {
+    return (function() {
+        return new Promise(function(resolve, reject) {
             /**
              * Define powerBi if it's undefined
              */
-            
+
             // If it's defined, resolve it
             if (!_.isUndefined(_powerBi)) {
                 resolve(_powerBi);
             }
-            
+
             // Get a token and resolve a new instance of PowerBI
-            getToken()
-            .then(function (token) {
-              resolve(new PowerBi(token));
+            azure.getToken()
+            .then(function(token) {
+                resolve(new PowerBi(token));
             })
             .catch(reject);
         });
     })()
-    .then(function (powerBi) {
-        return new Promise(function (resolve, reject) {
+    .then(function(powerBi) {
+        return new Promise(function(resolve, reject) {
             /**
              * Get the dataset either from file new
              */
-            
+
             // Set the filepath if it's undefined
             datasetPath = !_.isUndefined(datasetPath)
                 ? datasetPath
                 : path.resolve(__dirname, '../assets/datasets_{dataset}.json'.replace('{dataset}', datasetName));
-            
+
             var datasetInfo = readJsonFile(datasetPath);
-            
+
             // If the file doesn't exist, return powerBi.datasetExists(dataset)
             if (getNew || !datasetInfo.dataset) {
                 return powerBi.datasetExists(datasetName)
-                .then(function (_dataset) {
+                .then(function(_dataset) {
                     // Save file to datasetPath
                     writeJsonFile(datasetPath, _dataset);
-                    
+
                     resolve(_dataset.dataset.id);
                 })
                 .catch(reject);
             }
-            
+
             // Resolve the file contents
             resolve(datasetInfo.dataset.id);
         });
@@ -247,10 +247,10 @@ function getDataset(datasetName, _powerBi, getNew, datasetPath) {
  * @return {Object}
  */
 function storeICWSAuth(cookies, token, sessionId, icwsPath) {
-    
+
     var storable;
     var args = _.map(arguments);
-    
+
     storable = args.length === 1
         ? {
             cookies: args.cookies,
@@ -262,13 +262,13 @@ function storeICWSAuth(cookies, token, sessionId, icwsPath) {
             token: token,
             sessionId: sessionId
         };
-    
+
     icwsPath = !_.isUndefined(icwsPath)
         ? icwsPath
         : path.resolve('./assets/icws_auth.json');
-    
+
     writeJsonFile(icwsPath, storable);
-    
+
     return storable;
 }
 
@@ -279,13 +279,13 @@ function storeICWSAuth(cookies, token, sessionId, icwsPath) {
  * @return {Object}
  */
 function readICWSAuth(icwsPath) {
-    
-    icwsPath  = !_.isUndefined(icwsPath)
+
+    icwsPath = !_.isUndefined(icwsPath)
         ? icwsPath
         : path.resolve('./assets/icws_auth.json');
-    
+
     return readJsonFile(icwsPath);
-    
+
 }
 
 module.exports = {
