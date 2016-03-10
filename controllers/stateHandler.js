@@ -191,8 +191,8 @@ function getDataset(datasetName, _powerBi, getNew, datasetPath) {
              */
 
             // If it's defined, resolve it
-            if (!_.isUndefined(_powerBi)) {
-                resolve(_powerBi);
+            if (!_.isUndefined(_powerBi) && !!_powerBi.token) {
+                return resolve(_powerBi);
             }
 
             // Get a token and resolve a new instance of PowerBI
@@ -203,12 +203,12 @@ function getDataset(datasetName, _powerBi, getNew, datasetPath) {
             .catch(reject);
         });
     })()
-    .then(function(powerBi) {
+    .then(function(powerBi) { 
         return new Promise(function(resolve, reject) {
             /**
              * Get the dataset either from file new
              */
-
+            
             // Set the filepath if it's undefined
             datasetPath = !_.isUndefined(datasetPath)
                 ? datasetPath
