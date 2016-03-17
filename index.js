@@ -7,12 +7,14 @@ var utils = require('./lib/utils');
 
 var icws = require('./lib/icwsModule');
 
-icws.auth()
-.then(function (data) {
-    console.log(data);
-})
-.catch(function (err) {
-    console.log(err);
-})
 
-// icwsCtrl.run();
+// icws.auth()
+// .then(function (data) {
+//     console.log(data);
+// })
+// .catch(function (err) {
+//     console.log(err);
+// })
+
+icwsCtrl.run();
+
