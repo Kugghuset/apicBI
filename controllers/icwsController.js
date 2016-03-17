@@ -1,3 +1,4 @@
+'use strict'
 
 var _ = require('lodash');
 var Promise = require('bluebird');
@@ -6,6 +7,8 @@ var ICWS = require('../lib/icws');
 
 var icws = require('../lib/icwsModule');
 var _interval;
+
+var icwsUser = require('./icws/icws.user');
 
 // All users in the system
 var _users = [];
@@ -28,9 +31,13 @@ function poll() {
             ? res.body
             : res;
 
+        // icwsUser.watch(dataArr);
+
         var modifiedUsers = _.find(dataArr, function (data) { return _.get(data, '__type') === 'urn:inin.com:configuration.people:usersMessage' });
 
         if (modifiedUsers) {
+
+            console.log(JSON.stringify(modifiedUsers, null, 4));
 
             modifiedUsers.added = _.map(modifiedUsers.added, function (user) { return _.get(user, 'configurationId.id'); });
             modifiedUsers.changed = _.map(modifiedUsers.changed, function (user) { return _.get(user, 'configurationId.id'); });
@@ -43,26 +50,11 @@ function poll() {
 
             console.log('There are now {num} users.'.replace('{num}', _users.length));
 
-            // Update or create the queue subscription
-            queueSub('subscribe', 'kugghuset-1', _users)
-            .catch(function (res) { console.log(res) })
-            // dataArr = _.filter(dataArr, function (data) { return _.get(data, '__type') != 'urn:inin.com:configuration.people:usersMessage' });
-        }
-
-        var statusUpdates = _.find(dataArr, function (data) { return _.get(data, '__type') === 'urn:inin.com:status:userStatusMessage'; });
-
-        if (statusUpdates) {
-
-            var updatedUsers = _.map(statusUpdates.userStatusList, function (userStatus) {
-                return _.get(userStatus, 'userId');
-            });
-
-            updateUserStatuses(updatedUsers);
-
+            dataArr = _.filter(dataArr, function (data) { return _.get(data, '__type') != 'urn:inin.com:configuration.people:usersMessage' });
         }
 
         if (modifiedUsers && _users.length && _.isEqual({}, _usersByState)) {
-            updateUserStatuses(_users);
+            userStatusSub('subscribe', _users);
         }
 
         console.log(JSON.stringify((dataArr || {}), null, 4));
@@ -93,7 +85,9 @@ function unsubscribe(path) {
 }
 
 /**
- * Either subscribes to or unsubscribes to the
+ * Either subscribes or unsubscribes to the list of users.
+ *
+ * NOTE: must be used before *userStatusSub*
  *
  * @param {String} action
  * @return {Promise}
@@ -107,7 +101,7 @@ function userSub(action, subId) {
     var path = 'messaging/subscriptions/configuration/users/:id'
         .replace(':id', subId);
 
-    console.log('Subscribing to configurations/users');
+    console.log('Subscribing to the list of user in configurations/users');
 
     return /unsub/i.test(action)
         ? unsubscribe(path)
@@ -165,7 +159,7 @@ function workStationSub(action, subId) {
 }
 
 /**
- *
+ * Subscribes to the statuses of all *_user*.
  *
  * @param {String} action Should be either 'subscribe' or 'unsubscribe'
  * @param {Array} _users
@@ -178,17 +172,7 @@ function userStatusSub(action, _users) {
     return /unsub/i.test(action)
         ? unsubscribe(subPath)
         : subscribe(subPath, {
-            userIds: _.flatten(_users),
-            rightsFilter: 'view',
-            // userStatusProperties: [
-            //     'personalInformationProperties.companyName',
-            //     'personalInformationProperties.country',
-            //     'personalInformationProperties.departmentName',
-            //     'personalInformationProperties.emailAddress',
-            //     'personalInformationProperties.givenName',
-            //     'personalInformationProperties.surname',
-            //     'statusText'
-            // ]
+            userIds: _.flatten(_users)
         });
 }
 
@@ -232,50 +216,6 @@ function queueSub(action, subId, _users) {
 
 }
 
-/**
- * Updates users in _usersByState which are in userIds
- *
- * Docs here: https://developer.inin.com/documentation/Documents/ICWS/WebHelp/icws/(sessionId)/configuration/users/index.htm#get
- *
- * @param {String} userIds
- * @return {Promise} -> {Array}
- */
-function updateUserStatuses(userIds) {
-
-    var userUrl = [
-        'configuration/users/:id',
-        [
-            'rightsFilter=view',
-            'select=statusText,lastModifiedDate,workgroups'
-        ].join('&')
-    ].join('?')
-
-    var promises = _.map(userIds, function (userId) {
-        return icws.get(userUrl.replace(':id', userId));
-    });
-
-    Promise.all(_.map(promises, function (promise) { return promise.reflect(); }))
-    .then(function (data) {
-
-        var users = _.map(data, function (val) { return val.isRejected() ? val.reason() : (val.value() || {}).body; });
-
-        _usersByState = _.chain(users)
-            .map(function (user) {
-                return {
-                    id: _.get(user, 'configurationId.id'),
-                    name: _.get(user, 'configurationId.displayName'),
-                    status: _.get(user, 'statusText'),
-                    lastModifiedDate: _.get(user, 'lastModifiedDate'),
-                    workgroups: _.get(user, 'workgroups')
-                };
-            })
-            .groupBy('status')
-            .value();
-
-    })
-
-}
-
 /***************
  *
  * Exported functions.
@@ -299,7 +239,7 @@ function init() {
 function setupSubscriptions() {
     return new Promise(function (resolve, reject) {
 
-        var promises = [ userSub('subscribe', 'kugghuset-1'), workStationSub('subscribe', 'kugghuset-1') ];
+        var promises = [ userSub('subscribe', 'kugghuset-1') ];
 
         Promise.all(_.map(promises, function (promise) { return promise.reflect(); }))
         .then(function (data) {
@@ -326,7 +266,7 @@ function startPolling(ms) {
         console.log('Start polling ICWS server');
         _interval = setInterval(poll, ms)
     } else {
-        console.log('Polling already actives.');
+        console.log('Polling already active.');
     }
 
     return _interval;
@@ -397,7 +337,6 @@ function run() {
                 }
               ]
           })
-
         })
         .then(setupSubscriptions)
         .then(function (data) {
