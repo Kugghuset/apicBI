@@ -3,25 +3,22 @@ var env = require('node-env-file');
 env('./.env');
 
 var icwsCtrl = require('./controllers/icwsController');
+var utils = require('./lib/utils');
 
-// icwsCtrl.run();
+var icws = require('./lib/icwsModule');
+// var ICWS = require('./lib/icws');
 
-var azure = require('./lib/azure');
-var PowerBi = require('./lib/powerBi');
-var stateHandler = require('./controllers/stateHandler');
+// var _icws = new ICWS();
 
-azure.getToken('local')
-.then(function (token) {
-    var powerBi = new PowerBi(token);
-    
-    return stateHandler.getDataset('ApicBI', powerBi, true);
-})
-.then(function (datasets) {
-    console.log('datasets:');
-    console.log(datasets);
+icws.auth()
+.then(function (data) {
+    console.log(data);
 })
 .catch(function (err) {
     console.log(err);
 })
+
+// icwsCtrl.run();
+
 
 

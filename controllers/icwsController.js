@@ -405,7 +405,7 @@ function run() {
           })
           
         })
-        // .then(setupSubscriptions)
+        .then(setupSubscriptions)
         .then(function (data) {
             
             startPolling();
