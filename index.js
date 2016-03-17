@@ -6,9 +6,6 @@ var icwsCtrl = require('./controllers/icwsController');
 var utils = require('./lib/utils');
 
 var icws = require('./lib/icwsModule');
-// var ICWS = require('./lib/icws');
-
-// var _icws = new ICWS();
 
 icws.auth()
 .then(function (data) {
@@ -19,6 +16,3 @@ icws.auth()
 })
 
 // icwsCtrl.run();
-
-
-

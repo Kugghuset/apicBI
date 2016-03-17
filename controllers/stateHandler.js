@@ -11,7 +11,7 @@ var _tokenPath = path.resolve(__dirname, '../assets/token.json');
 
 /**
  * Saves the token data to file.
- * 
+ *
  * @param {String} token
  * @param {String} refreshToken
  * @param {String|Number} expiresOn
@@ -56,7 +56,7 @@ setupTokenData();
 
 /**
  * Reads the filecontents and returns an object containing it.
- * 
+ *
  * @param {string} filepath Relative or absolute path to file
  * @return {object} If file exists, the file contents, otherwise an empty object
  */
@@ -81,7 +81,7 @@ function readJsonFile(_filepath) {
 
 /**
  * Writes the object to a file.
- * 
+ *
  * @param {object} content Data
  * @return {Boolean}
  */
@@ -125,7 +125,7 @@ function writeJsonFile(_filepath, content) {
 /**
  * Migrates the old timestamp .txt file to a new .json file.
  * This will delete the old file completely.
- * 
+ *
  * @param {string} txtPath Relative or absolute file path to the .txt timestamp file
  * @param {string} jsonPath Relative or absolute file path to the .json timestamp file
  */
@@ -154,7 +154,7 @@ function migrateTxtToJson(txtPath, jsonPath) {
 /**
  * Returns the timestamp from *filepath*
  * or the start of the current week.
- * 
+ *
  * @param {string} filepath
  * @return {date}
  */
@@ -176,7 +176,7 @@ function getLastUpdated(filepath) {
 /**
  * Returns a promise of the dataset with its name matching *dataset*.
  * If a new is fetched, it's stored in the assets folder.
- * 
+ *
  * @param {string} dataset Name of dataset
  * @param {object} _powerBi
  * @param {boolean} getNew
@@ -203,12 +203,12 @@ function getDataset(datasetName, _powerBi, getNew, datasetPath) {
             .catch(reject);
         });
     })()
-    .then(function(powerBi) { 
+    .then(function(powerBi) {
         return new Promise(function(resolve, reject) {
             /**
              * Get the dataset either from file new
              */
-            
+
             // Set the filepath if it's undefined
             datasetPath = !_.isUndefined(datasetPath)
                 ? datasetPath
@@ -237,9 +237,9 @@ function getDataset(datasetName, _powerBi, getNew, datasetPath) {
 /**
  * Stores cookies, token and sessionId used as
  * authentication to the ICWS server.
- * 
+ *
  * Returns the stored object.
- * 
+ *
  * @param {Array} cookies
  * @param {String} token
  * @param {String} sessionId
@@ -274,7 +274,7 @@ function storeICWSAuth(cookies, token, sessionId, icwsPath) {
 
 /**
  * Returns the stored ICWS auth data stored in storeICWSAuth(...).
- * 
+ *
  * @param {String} icwsPath Not required
  * @return {Object}
  */
