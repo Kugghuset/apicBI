@@ -31,40 +31,17 @@ function poll() {
             ? res.body
             : res;
 
-        // icwsUser.watch(dataArr);
+        // Watch for, and handles changes regarding users
+        icwsUser.watch(dataArr);
 
-        var modifiedUsers = _.find(dataArr, function (data) { return _.get(data, '__type') === 'urn:inin.com:configuration.people:usersMessage' });
+        var _data = _.find(dataArr, function (data) { return _.get(data, '__type') === 'urn:inin.com:queues:queueContentsMessage'; });
 
-        if (modifiedUsers) {
-
-            console.log(JSON.stringify(modifiedUsers, null, 4));
-
-            modifiedUsers.added = _.map(modifiedUsers.added, function (user) { return _.get(user, 'configurationId.id'); });
-            modifiedUsers.changed = _.map(modifiedUsers.changed, function (user) { return _.get(user, 'configurationId.id'); });
-            modifiedUsers.removed = _.map(modifiedUsers.removed, function (user) { return _.get(user, 'configurationId.id'); });
-
-            // Filter out any removed users
-            _users = _.filter(_users, function (user) { return ~modifiedUsers.removed.indexOf(user); })
-            // Combine the added users with the existing users
-            _users = _.uniq(_users.concat(modifiedUsers.added));
-
-            console.log('There are now {num} users.'.replace('{num}', _users.length));
-
-            dataArr = _.filter(dataArr, function (data) { return _.get(data, '__type') != 'urn:inin.com:configuration.people:usersMessage' });
-        }
-
-        if (modifiedUsers && _users.length && _.isEqual({}, _usersByState)) {
-            userStatusSub('subscribe', _users);
-        }
-
-        console.log(JSON.stringify((dataArr || {}), null, 4));
-
+        if (_data) { console.log(JSON.stringify(_data, null, 4)); }
     });
 }
 
 /**
  * Creates a subscription to *path* with *content*.
- * _L
  *
  * @param {String} path
  * @param {Object} body
@@ -207,10 +184,10 @@ function queueSub(action, subId, _users) {
                 'Eic_ConnectDurationTime',
                 'Eic_CallId',
                 'Eic_RemoteName',
-                'Eic_RemoteTn'
+                'Eic_RemoteTn',
             ],
 
-            rightsFilter: 'view'
+            rightsFilter: 'view',
 
         });
 

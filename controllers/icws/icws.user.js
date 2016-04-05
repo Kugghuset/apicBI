@@ -13,7 +13,8 @@ var icwsSub = require('./icws.sub');
  */
 var _typeIds = {
     updateUsers: 'urn:inin.com:configuration.people:usersMessage',
-    updateStatuses: 'urn:inin.com:status:userStatusMessage'
+    updateStatuses: 'urn:inin.com:status:userStatusMessage',
+    updateUserQueus: 'urn:inin.com:queues:queueContentsMessage',
 }
 
 // The complete list of users
@@ -26,6 +27,7 @@ var _users = [];
 var watchers = {
     updateUsers: updateUsers,
     updateStatuses: updateStatuses,
+    updateUserQueus: updateUserQueus,
 }
 
 /**
@@ -36,36 +38,231 @@ function watch(dataArr) {
     var toCall = _.chain(_typeIds)
         .map(function (__type, key) {
             var _data = _.find(dataArr, function (data) { return _.get(data, '__type') === __type });
+            // If there is *_data*, return an object where *key* is the key and *_data* is the value.
             return !!_data
-                ? [[key], [_data]]
+                ? _.set({}, key, _data)
                 : undefined;
         })
         .filter()
-        .thru(function (_data) { return _.zipObject(_data) })
+        .reduce(function (obj, current) { return _.assign({}, obj, current); }, {})
         .value();
 
-
-    console.log(toCall);
-
-    // Call every watcher wich was matched
-    // _.forEach(toCall, function (val, key) { watchers[key](val); })
-
+    // Call every matched watcher
+    _.forEach(toCall, function (val, key) {
+        // Call the function if it's defined
+        if (_.isFunction(watchers[key])) { watchers[key](val); }
+    });
 }
 
 /**
+ * Handles user updates.
+ *
  * @param {Object} data The raw data received from ININ
  */
 function updateUsers(data) {
+    // Get all added users
+    var _added = _.map(data.added, function (user) {
+        return {
+            id: _.get(user, 'configurationId.id'),
+            name: _.get(user, 'configurationId.displayName'),
+            statusName: _.get(user, 'statusText'),
+        }
+    });
 
+    // Get all removed users
+    var _removed = _.map(data.removed, function (user) { return _.get(user, 'configurationId.id'); })
+
+    var _changed = _.map(data.changed, function (user) {
+        return {
+            id: _.get(user, 'configurationId.id'),
+            name: _.get(user, 'configurationId.displayName'),
+            statusName: _.get(user, 'statusText'),
+        }
+    });
+
+    // Check if there are any changes in any of the arrays
+    if (_.some([_added, _removed, _changed], _.some)) {
+        // Update users if there's been a change
+        _users = _.chain(_users)
+            // Filter out any removed users
+            .filter(function (user) { return !!~_removed.indexOf(user.id); })
+            // Filter out any modified users, as to not have duplicate entries
+            .filter(function (user) { return !_.find(_changed, { id: user.id }) })
+            // Get the complete list of users
+            .thru(function (users) { return users.concat(_added, _changed); })
+            .value();
+
+        console.log('There are now {num} users!'.replace('{num}', _users.length));
+
+        // Get the ids to added users and, if any, subscribe to their statuses
+        var _addedIds = _.map(_added, 'id');
+        if (_.some(_addedIds)) {
+            userStatusSub('subscribe', _addedIds);
+            userQueueSub('subscribe', undefined, _addedIds);
+        }
+
+        // If any removed, unsubscribe to their statuses
+        if (_.some(_removed)) {
+            userStatusSub('unsubscribe', _removed);
+            userQueueSub('unsubscribe', undefined, _removed);
+        }
+    }
+}
+
+/**
+ * Attaches/updats the status data of
+ *
+ * @param {Object} data The raw data received from ININ
+ */
+function updateStatuses(data) {
+    // Get the changes
+    var _statUsers = _.map(data.userStatusList, function (user) {
+      return {
+          id: user.userId,
+          statusName: user.statusId,
+          loggedIn: user.loggedIn,
+          onPhone: user.onPhone,
+          stations: user.stations,
+      }
+    });
+
+    // Update all users
+    _.forEach(_statUsers, function (user) {
+        // Find the user to update
+        var _user = _.find(_users, { id: user.id });
+
+        // Assign the changes to *_user* if it exists
+        if (_user) { _user = _.assign(_user, user); }
+    });
 }
 
 /**
  * @param {Object} data The raw data received from ININ
  */
-function updateStatuses(data) {
+function updateUserQueus(data) {
+    console.log('lolwoo');
+    console.log(data);
+    console.log('lolwoo');
+}
+
+/*****************
+ * Subscriptions
+ *****************/
+
+/**
+ * Subscribes or unsubscribes to updates to the user list.
+ *
+ * @param {String} action The action to take, should be either subscribe or unsubscribe. Defaults to subscribe
+ * @param {String} subId Subscription ID string, defaults to 'kugghuset-1'
+ */
+function userListSub(action, subId) {
+    // Use default value of subId if undefined
+    subId = !_.isUndefined(subId)
+        ? subId
+        : 'kugghuset-1';
+
+    var path = 'messaging/subscriptions/configuration/users/:id'
+        .replace(':id', subId);
+
+    console.log('Subscribing to the list of user in configurations/users');
+
+    return /unsub/i.test(action)
+        ? icwsSub.unsubscribe(path)
+        : icwsSub.subscribe(path, {
+            configurationIds: [
+                '*'
+            ],
+            properties: [
+                'personalInformationProperties.emailAddress',
+                'personalInformationProperties.givenName',
+                'personalInformationProperties.surname',
+                'clientConfigDateLastModified',
+                'lastModifiedDate',
+                'statusText'
+            ],
+            rightsFilter: 'view'
+        });
+}
+
+/**
+ * Subscribes to the statuses of all *_user*.
+ *
+ * @param {String} action Should be either 'subscribe' or 'unsubscribe'
+ * @param {Array} users The users to take action on
+ * @return {Promise}
+ */
+function userStatusSub(action, users) {
+
+    var subPath = 'messaging/subscriptions/status/user-statuses';
+
+    console.log('Subscribing to {num} users\' statuses.'.replace('{num}', users.length));
+
+    return /unsub/i.test(action)
+        ? icwsSub.unsubscribe(subPath)
+        : icwsSub.subscribe(subPath, {
+            userIds: users
+        });
+}
+
+
+/**
+ * Subscribes to all queus for *_users*
+ *
+ * NOT WORKING
+ *
+ * @param {String} action Should be either 'subscribe' or 'unsubscribe'
+ * @param {String|Number} subId
+ * @param {Array} _users The user ids (firstname.lastname) to listen for.
+ * @return {Promise}
+ */
+function userQueueSub(action, subId, users) {
+
+    subId = !_.isUndefined(subId)
+        ? subId
+        : 'kugghuset-1';
+
+    // Get all queueIds to subscrube to
+    var queueIds = _.map(users, function (user) { return { queueType: 1, queueName: (user.id || user) }; })
+
+    var subPath = 'messaging/subscriptions/queues/:id'
+        .replace(':id', subId)
+
+    return /unsub/i.test(action)
+        ? icwsSub.unsubscribe(subPath)
+        : icwsSub.subscribe(subPath, {
+
+            queueIds: queueIds,
+            attributeNames: [
+                'Eic_State',
+                'Eic_ConnectDurationTime',
+                'Eic_CallId',
+                'Eic_RemoteName',
+                'Eic_RemoteTn',
+            ],
+
+            rightsFilter: 'view',
+
+        });
 
 }
 
+/**
+ * Sets the user subscriptions up.
+ *
+ * @param {String} subId Subscription ID string, defaults to 'kugghuset-1'
+ * @return {String} subId
+ */
+function setup(subId) {
+  // Use default value of subId if undefined
+    subId = !_.isUndefined(subId)
+        ? subId
+        : 'kugghuset-1';
+
+    userListSub('subscribe', subId);
+    return subId;
+}
+
 module.exports = {
-    watch: watch
+    watch: watch,
+    setup: setup,
 }
