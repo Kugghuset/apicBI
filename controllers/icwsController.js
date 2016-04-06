@@ -34,9 +34,20 @@ function poll() {
         // Watch for, and handles changes regarding users
         icwsUser.watch(dataArr);
 
-        var _data = _.find(dataArr, function (data) { return _.get(data, '__type') === 'urn:inin.com:queues:queueContentsMessage'; });
+        // var _data = _.find(dataArr, function (data) { return _.get(data, '__type') === 'urn:inin.com:queues:queueContentsMessage'; });
+        // _data = dataArr;
 
-        if (_data) { console.log(JSON.stringify(_data, null, 4)); }
+        var _workStationData = _.find(dataArr, function (data) { return _.get(data, '__type') === 'urn:inin.com:configuration.people:workgroupsMessage'; });
+        var _queueData = _.find(dataArr, function (data) { return _.get(data, '__type') === 'urn:inin.com:queues:queueContentsMessage'; });
+
+        if (_workStationData) {
+            console.log(JSON.stringify(_workStationData.added, null, 4));
+            queueSub('subscribe', 'kugghuset-1', _.map(_workStationData.added, function (data) { return { id: _.get(data, 'configurationId.id') }; }));
+        }
+
+        if (_queueData) {
+            console.log(JSON.stringify(_queueData, null, 4));
+        }
     });
 }
 
@@ -62,44 +73,6 @@ function unsubscribe(path) {
 }
 
 /**
- * Either subscribes or unsubscribes to the list of users.
- *
- * NOTE: must be used before *userStatusSub*
- *
- * @param {String} action
- * @return {Promise}
- */
-function userSub(action, subId) {
-
-    subId = !_.isUndefined(subId)
-        ? subId
-        : 'kugghuset-1';
-
-    var path = 'messaging/subscriptions/configuration/users/:id'
-        .replace(':id', subId);
-
-    console.log('Subscribing to the list of user in configurations/users');
-
-    return /unsub/i.test(action)
-        ? unsubscribe(path)
-        : subscribe(path, {
-            configurationIds: [
-                '*'
-            ],
-            properties: [
-                'personalInformationProperties.emailAddress',
-                'personalInformationProperties.givenName',
-                'personalInformationProperties.surname',
-                'clientConfigDateLastModified',
-                'lastModifiedDate',
-                'statusText'
-            ],
-            rightsFilter: 'view'
-        });
-
-}
-
-/**
  * Subscribes or unsubscribes to workstations which are 'CSA'
  * with the subscription id *subId*.
  *
@@ -120,9 +93,10 @@ function workStationSub(action, subId) {
         ? unsubscribe(path)
         : subscribe(path, {
             configurationIds: [
-                 {
-                     id: 'CSA'
-                 }
+                // {
+                //     id: 'CSA',
+                // },
+                '*'
             ],
             properties: [
                 'hasQueue',
@@ -135,23 +109,6 @@ function workStationSub(action, subId) {
         });
 }
 
-/**
- * Subscribes to the statuses of all *_user*.
- *
- * @param {String} action Should be either 'subscribe' or 'unsubscribe'
- * @param {Array} _users
- * @return {Promise}
- */
-function userStatusSub(action, _users) {
-
-    var subPath = 'messaging/subscriptions/status/user-statuses';
-
-    return /unsub/i.test(action)
-        ? unsubscribe(subPath)
-        : subscribe(subPath, {
-            userIds: _.flatten(_users)
-        });
-}
 
 /**
  * Subscribes to all queus for *_users*
@@ -163,34 +120,44 @@ function userStatusSub(action, _users) {
  * @param {Array} _users The user ids (firstname.lastname) to listen for.
  * @return {Promise}
  */
-function queueSub(action, subId, _users) {
+function queueSub(action, subId, users) {
 
     subId = !_.isUndefined(subId)
         ? subId
         : 'kugghuset-1';
 
-    var queueIds = _.map(_users, function (user) { return { queueType: 1, queueName: user }; })
+    /**
+     * When queueType is set to 0, a single messages will be recieved, but with no added interactions.
+     */
+
+    // Get all queueIds to subscrube to
+    // var queueIds = _.map(users, function (user) { return { queueType: 2, queueName: (user.id || user) }; })
 
     var subPath = 'messaging/subscriptions/queues/:id'
         .replace(':id', subId)
+
+    console.log('Subscribing to {name} queue!'.replace('{name}', 'CSA'));
 
     return /unsub/i.test(action)
         ? unsubscribe(subPath)
         : subscribe(subPath, {
 
-            queueIds: queueIds,
+            queueIds: {
+                queueType: 2,
+                queueName: 'CSA'
+            },
             attributeNames: [
                 'Eic_State',
                 'Eic_ConnectDurationTime',
                 'Eic_CallId',
                 'Eic_RemoteName',
                 'Eic_RemoteTn',
+                'Eic_WorkgroupName',
+                'Eic_InitiationTime',
+                'Eic_TerminationTime',
             ],
-
             rightsFilter: 'view',
-
         });
-
 }
 
 /***************
@@ -216,7 +183,7 @@ function init() {
 function setupSubscriptions() {
     return new Promise(function (resolve, reject) {
 
-        var promises = [ userSub('subscribe', 'kugghuset-1') ];
+        var promises = [ icwsUser.setup(), workStationSub('subscribe', 'kugghuset-1') ];
 
         Promise.all(_.map(promises, function (promise) { return promise.reflect(); }))
         .then(function (data) {

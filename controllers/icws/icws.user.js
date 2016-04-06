@@ -14,7 +14,6 @@ var icwsSub = require('./icws.sub');
 var _typeIds = {
     updateUsers: 'urn:inin.com:configuration.people:usersMessage',
     updateStatuses: 'urn:inin.com:status:userStatusMessage',
-    updateUserQueus: 'urn:inin.com:queues:queueContentsMessage',
 }
 
 // The complete list of users
@@ -27,7 +26,6 @@ var _users = [];
 var watchers = {
     updateUsers: updateUsers,
     updateStatuses: updateStatuses,
-    updateUserQueus: updateUserQueus,
 }
 
 /**
@@ -98,13 +96,11 @@ function updateUsers(data) {
         var _addedIds = _.map(_added, 'id');
         if (_.some(_addedIds)) {
             userStatusSub('subscribe', _addedIds);
-            userQueueSub('subscribe', undefined, _addedIds);
         }
 
         // If any removed, unsubscribe to their statuses
         if (_.some(_removed)) {
             userStatusSub('unsubscribe', _removed);
-            userQueueSub('unsubscribe', undefined, _removed);
         }
     }
 }
@@ -132,17 +128,11 @@ function updateStatuses(data) {
         var _user = _.find(_users, { id: user.id });
 
         // Assign the changes to *_user* if it exists
-        if (_user) { _user = _.assign(_user, user); }
+        if (_user) {
+            _user = _.assign(_user, user);
+            console.log('{user} changed, {status}.'.replace('{user}', _user.id).replace('{status}', _user.statusName));
+        }
     });
-}
-
-/**
- * @param {Object} data The raw data received from ININ
- */
-function updateUserQueus(data) {
-    console.log('lolwoo');
-    console.log(data);
-    console.log('lolwoo');
 }
 
 /*****************
@@ -204,48 +194,6 @@ function userStatusSub(action, users) {
         });
 }
 
-
-/**
- * Subscribes to all queus for *_users*
- *
- * NOT WORKING
- *
- * @param {String} action Should be either 'subscribe' or 'unsubscribe'
- * @param {String|Number} subId
- * @param {Array} _users The user ids (firstname.lastname) to listen for.
- * @return {Promise}
- */
-function userQueueSub(action, subId, users) {
-
-    subId = !_.isUndefined(subId)
-        ? subId
-        : 'kugghuset-1';
-
-    // Get all queueIds to subscrube to
-    var queueIds = _.map(users, function (user) { return { queueType: 1, queueName: (user.id || user) }; })
-
-    var subPath = 'messaging/subscriptions/queues/:id'
-        .replace(':id', subId)
-
-    return /unsub/i.test(action)
-        ? icwsSub.unsubscribe(subPath)
-        : icwsSub.subscribe(subPath, {
-
-            queueIds: queueIds,
-            attributeNames: [
-                'Eic_State',
-                'Eic_ConnectDurationTime',
-                'Eic_CallId',
-                'Eic_RemoteName',
-                'Eic_RemoteTn',
-            ],
-
-            rightsFilter: 'view',
-
-        });
-
-}
-
 /**
  * Sets the user subscriptions up.
  *
@@ -258,8 +206,7 @@ function setup(subId) {
         ? subId
         : 'kugghuset-1';
 
-    userListSub('subscribe', subId);
-    return subId;
+    return userListSub('subscribe', subId);
 }
 
 module.exports = {
