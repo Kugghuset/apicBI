@@ -198,10 +198,10 @@ function userStatusSub(action, users) {
  * Sets the user subscriptions up.
  *
  * @param {String} subId Subscription ID string, defaults to 'kugghuset-1'
- * @return {String} subId
+ * @return {Promise}
  */
 function setup(subId) {
-  // Use default value of subId if undefined
+    // Use default value of subId if undefined
     subId = !_.isUndefined(subId)
         ? subId
         : 'kugghuset-1';

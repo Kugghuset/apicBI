@@ -47,3 +47,4 @@ datasets_*.*
 icws_auth.*
 **/typings
 tsd.json
+assets/icws
