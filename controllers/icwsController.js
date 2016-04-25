@@ -35,23 +35,6 @@ function poll() {
         // Watch for, and handles changes regarding users
         icwsUser.watch(dataArr);
         icwsWorkgroup.watch(dataArr);
-
-
-
-        // var _data = _.find(dataArr, function (data) { return _.get(data, '__type') === 'urn:inin.com:queues:queueContentsMessage'; });
-        // _data = dataArr;
-
-        // var _workStationData = _.find(dataArr, function (data) { return _.get(data, '__type') === 'urn:inin.com:configuration.people:workgroupsMessage'; });
-        // var _queueData = _.find(dataArr, function (data) {return _.get(data, '__type') === 'urn:inin.com:queues:queueContentsMessage'; });
-        // if (_queueData) {
-        //     console.log(JSON.stringify(_queueData, null, 4));
-        // }
-
-        // if (_workStationData) {
-        //     console.log(JSON.stringify(_workStationData.added, null, 4));
-        //     queueSub('subscribe', 'kugghuset-1', _.map(_workStationData.added, function (data) { return { id: _.get(data, 'configurationId.id') }; }));
-        // }
-
     });
 }
 

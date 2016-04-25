@@ -7,6 +7,7 @@ var path = require('path');
 var moment = require('moment');
 
 var icwsSub = require('./icws.sub');
+var icws = require('../../lib/icwsModule');
 
 /**
  * The __types to watch changes for.
@@ -61,11 +62,6 @@ function watch(dataArr) {
  */
 function updateInteractions(data) {
 
-    /**
-     * TODO: Figure out why interactionsRemoved is used. Is it because they're finished? Missed?
-     * Why?
-     */
-
     // Get all added interactions
     var _added = _.map(data.interactionsAdded, function (interaction) {
         // Return all of the following properties where there is a value.
@@ -78,15 +74,11 @@ function updateInteractions(data) {
             remoteId: _.get(interaction, 'attributes.Eic_RemoteId'),
             remoteName: _.get(interaction, 'attributes.Eic_RemoteName'),
             duration: _.get(interaction, 'attributes.Eic_ConnectDurationTime'),
-            state: _.get(interaction, 'attributes.Eic_State'),
+            state: getState(interaction),
             workgroup: _.get(interaction, 'attributes.Eic_WorkgroupName'),
             userName: _.get(interaction, 'attributes.Eic_UserName'),
-            startDate: !!_.get(interaction, 'attributes.Eic_InitiationTime')
-                ? new Date(_.get(interaction, 'attributes.Eic_InitiationTime'))
-                : undefined,
-            endDate: !!_.get(interaction, 'attributes.Eic_TerminationTime')
-                ? new Date(_.get(interaction, 'attributes.Eic_TerminationTime'))
-                : undefined,
+            startDate: getDate(interaction, 'Eic_InitiationTime'),
+            endDate: getDate(interaction, 'Eic_TerminationTime'),
         }, function (obj, value, key) {
             return !!value
                 ? _.assign({}, obj, _.set({}, key, value))
@@ -106,7 +98,7 @@ function updateInteractions(data) {
             remoteId: _.get(interaction, 'attributes.Eic_RemoteId'),
             remoteName: _.get(interaction, 'attributes.Eic_RemoteName'),
             duration: _.get(interaction, 'attributes.Eic_ConnectDurationTime'),
-            state: _.get(interaction, 'attributes.Eic_State'),
+            state: getState(interaction),
             workgroup: _.get(interaction, 'attributes.Eic_WorkgroupName'),
             userName: _.get(interaction, 'attributes.Eic_UserName'),
             startDate: !!_.get(interaction, 'attributes.Eic_InitiationTime')
@@ -130,6 +122,12 @@ function updateInteractions(data) {
     if (_.some(_added)) {
         // Add them all
         _activeInteractions = _activeInteractions.concat(_added);
+
+        console.log('\nAdded interactions:');
+        console.log(JSON.stringify(_added, null, 4));
+
+        var _interactionPath = path.resolve(__dirname, '../../assets/icws/addedInteractions{date}.json'.replace('{date}', moment().format('HHmmss')));
+        // fs.writeFileSync(_interactionPath, JSON.stringify(_activeInteractions, null, 4), 'utf8');
     }
 
     // Handle changes
@@ -137,12 +135,20 @@ function updateInteractions(data) {
         _.forEach(_changed, function (interaction) {
             var _interaction = _.find(_activeInteractions, { id: interaction.id });
             // Update the interaction
-            if (_interaction) { _interaction = _.assign({}, _interaction, interaction); }
+            if (_interaction) {
+                // Get the position of the item
+                var _index = _.indexOf(_activeInteractions, _interaction);
+                // Merge the objects
+                var _updated = _.assign({}, _interaction, interaction);
+                // Splice in the updated version instead of the original item
+                _activeInteractions.splice(_index, 1, _updated);
+            }
         });
 
+        console.log('\nChanged interactions');
         console.log(JSON.stringify(_changed, null, 4));
 
-        // var _interactionPath = path.resolve(__dirname, '../../assets/icws/interactions{date}.json'.replace('{date}', moment().format('HHmmss')));
+        var _interactionPath = path.resolve(__dirname, '../../assets/icws/interactions{date}.json'.replace('{date}', moment().format('HHmmss')));
         // fs.writeFileSync(_interactionPath, JSON.stringify(_activeInteractions, null, 4), 'utf8');
     }
 
@@ -150,10 +156,11 @@ function updateInteractions(data) {
     if (_.some(_removed)) {
         var _removedItems = _.remove(_activeInteractions, function (interaction) { return !!~_removed.indexOf(interaction.id); });
         _finishedInteractions.concat(_removedItems);
+        console.log('\nRemoved interactions:');
         console.log(JSON.stringify(_removedItems, null, 4));
 
-        // var _removedInteractionPath = path.resolve(__dirname, '../../assets/icws/removedInteractions{date}.json'.replace('{date}', moment().format('HHmmss')));
-        // fs.writeFileSync(_finishedInteractions, JSON.stringify(_removed, null, 4), 'utf8');
+        var _finishedInteractionsPath = path.resolve(__dirname, '../../assets/icws/removedInteractions{date}.json'.replace('{date}', moment().format('HHmmss')));
+        // fs.writeFileSync(_finishedInteractionsPath, JSON.stringify(_removedItems, null, 4), 'utf8');
     }
 }
 
@@ -184,6 +191,12 @@ function updateWorkstations(data) {
     // Get all removed workstations
     var _removed = _.map(data.removed, function (workstation) { return _.get(workstation, 'configurationId.id'); });
 
+    /**
+     * TODO: Fill in the gap when there is no end date, but there's a start date and duration.
+     *
+     * TODO: push to some sort of database
+     */
+
     if (_.some([_added, _changed, _removed]), _.some) {
         // Update _workStations
         _workstations = _.chain(_workstations)
@@ -210,6 +223,64 @@ function updateWorkstations(data) {
     }
 }
 
+/**
+ * Returns a string of the current state.
+ *
+ * @param {Object} interaction The interaction object returned from ININ
+ * @return {String} The state as a readable string instead of a single character
+ */
+function getState(interaction) {
+    var _state;
+
+    if (_.get(interaction, 'attributes.Eic_State') === 'A') {
+        _state = 'Alerting agent'
+    } else if (_.get(interaction, 'attributes.Eic_State') === 'C') {
+        _state = 'On call';
+    } else if (_.get(interaction, 'attributes.Eic_State') === 'H') {
+        _state = 'On hold'
+    } else if (_.get(interaction, 'attributes.Eic_State') === 'M') {
+        _state = 'Voicemail';
+    } else if (_.get(interaction, 'attributes.Eic_State') === 'O') {
+        _state = 'Offering';
+    } else if (_.get(interaction, 'attributes.Eic_State') === 'R') {
+        _state = 'Awaiting answer';
+    } else if (_.get(interaction, 'attributes.Eic_State') === 'P') {
+        _state = 'Parked';
+    } else if (_.get(interaction, 'attributes.Eic_State') === 'E') {
+        _state = 'Call ended remotely';
+    } else if (_.get(interaction, 'attributes.Eic_State') === 'I') {
+        _state = 'Call ended locally';
+    } else if (_.get(interaction, 'attributes.Eic_State') === 'S') {
+        _state = 'Dialing';
+    } else {
+        console.log(_.get(interaction, 'attributes.Eic_State'));
+        _state = 'Unknown';
+    }
+
+    return _state;
+}
+
+/**
+ * @param {Object} interaction The interaction object returned
+ * @param {String} dateType The type of date to return
+ * @return {Date}
+ */
+function getDate(interaction, dateType) {
+    var _date;
+
+    if (dateType === 'Eic_InitiationTime') {
+        _date = !!_.get(interaction, 'attributes.Eic_InitiationTime')
+            ? moment(_.get(interaction, 'attributes.Eic_InitiationTime')).toDate()
+            : undefined
+    } else if (dateType === 'Eic_TerminationTime') {
+        _date = !!_.get(interaction, 'attributes.Eic_TerminationTime')
+            ? moment(_.get(interaction, 'attributes.Eic_TerminationTime')).toDate()
+            : undefined;
+    }
+
+    return _date;
+}
+
 /****************
  * Subscriptions
  ****************/
@@ -234,17 +305,30 @@ function workStationSub(action, subId) {
         ? icwsSub.unsubscribe(path)
         : icwsSub.subscribe(path, {
             configurationIds: [
+                '*',
                 'CSA',
+                // 'Partner Service',
             ],
             properties: [
                 'hasQueue',
                 'isActive',
                 'isWrapUpActive',
                 'isCallbackEnabled',
-                'isAcdEmailRoutingActive'
+                'isAcdEmailRoutingActive',
+                'queueType',
             ],
             rightsFilter: 'view'
         });
+}
+
+/**
+ * Enumeration of the various queueTypes
+ */
+var _queueTypes = {
+    system: 0,
+    user: 1,
+    workgroup: 2,
+    station: 3,
 }
 
 /**
@@ -255,7 +339,6 @@ function workStationSub(action, subId) {
  * @param {Array} workstations The workstation ids (firstname.lastname) to listen for.
  * @return {Promise}
  */
-
 function queueSub(action, subId, workstations) {
     // Use default value of subId if undefined
     subId = !_.isUndefined(subId)
@@ -263,37 +346,47 @@ function queueSub(action, subId, workstations) {
         : 'kugghuset-1';
 
     // Get all queueIds to subscribe to
-    var _queueIds = _.map(workstations, function (workstation) { return { queueType: 2, queueName: (workstation.id || workstation) }; })
+    var _queueIds = _.chain(workstations)
+        .map(function (workstation) { return { queueType: _queueTypes.workgroup, queueName: (workstation.id || workstation) }; })
+        .filter(function (item) {
+            // Filter out any not of interest workstations
+            return !!~[
+                'CSA',
+                // 'Partner Service',
+            ].indexOf(item.queueName);
+        })
+        .value();
 
     var _subPath = 'messaging/subscriptions/queues/:id'
         .replace(':id', subId)
 
-    console.log('Subscribing to {num} queue!'.replace('{num}', _queueIds.length));
+    console.log('Subscribing to {num} queue(s)!'.replace('{num}', _queueIds.length));
+
+    var _options = {
+        queueIds: _queueIds,
+        attributeNames: [
+            'Eic_WorkgroupName',
+            'Eic_InitiationTime',
+            'Eic_TerminationTime',
+            'Eic_CallId',
+            'Eic_RemoteAddress',
+            'Eic_RemoteId',
+            'Eic_RemoteName',
+            'Eic_UserName',
+            'Eic_CallStateString',
+            'Eic_CallDirection',
+            'Eic_ObjectType',
+            'Eic_CallType',
+            'Eic_State',
+            'Eic_ConnectDurationTime',
+            'Eic_RemoteTn',
+        ],
+        rightsFilter: 'view',
+    };
 
     return /unsub/i.test(action)
         ? icwsSub.unsubscribe(_subPath)
-        : icwsSub.subscribe(_subPath, {
-
-            queueIds: _queueIds,
-            attributeNames: [
-                'Eic_WorkgroupName',
-                'Eic_InitiationTime',
-                'Eic_TerminationTime',
-                'Eic_CallId',
-                'Eic_RemoteAddress',
-                'Eic_RemoteId',
-                'Eic_RemoteName',
-                'Eic_UserName',
-                'Eic_CallStateString',
-                'Eic_CallDirection',
-                'Eic_ObjectType',
-                'Eic_CallType',
-                'Eic_State',
-                'Eic_ConnectDurationTime',
-                'Eic_RemoteTn',
-            ],
-            rightsFilter: 'view',
-        });
+        : icwsSub.subscribe(_subPath, _options);
 }
 
 /**
