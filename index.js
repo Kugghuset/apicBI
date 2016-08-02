@@ -1,54 +1,42 @@
+'use strict'
 
 var env = require('node-env-file');
 env('./.env');
 
+var express = require('express');
+var path = require('path');
+
 var icwsCtrl = require('./controllers/icwsController');
 var utils = require('./lib/utils');
-
 var icws = require('./lib/icwsModule');
 
+var app = express();
+var root = path.resolve();
 
-// icws.auth()
-// .then(function () {
 
-//     return icws.put('messaging/subscriptions/configuration/workgroups/1', {
-//         "configurationIds": [
-//             "*"
-//         ],
-//         "properties": [
-//             "hasQueue",
-//             "isActive",
-//             "isWrapUpActive",
-//             "isCallbackEnabled",
-//             "isAcdEmailRoutingActive"
-//         ],
-//         "rightsFilter": "view"
-//     })
-// })
-// .then(function (data) {
-//     if (data) { console.log(data); }
+app.use(express.static(root + '/www'));
 
-//     return icws.get('status/status-messages-user-access/integration.kugghuset')
-// })
-// .then(function (data) {
-//     console.log(data);
+var router = new express.Router();
 
-//     return icws.get('status/status-messages')
-// })
-// .then(function (data) {
-//     console.log(data);
-// })
-// .catch(function (err) {
-//     console.log(err);
-// })
+router.get('/users', function (req, res) {
+  var users = icwsCtrl.getUsers();
 
-// icws.auth()
-// .then(function (data) {
-//     console.log(data);
-// })
-// .catch(function (err) {
-//     console.log(err);
-// })
+  res.status(200).json(users);
+});
 
-icwsCtrl.run();
+router.get('/interactions', function (req, res) {
+  var interactions = icwsCtrl.getInteractions();
 
+  res.status(200).json(interactions);
+});
+
+app.use(router);
+
+var server = app.listen(5000, 'localhost', function () {
+    var host = server.address().address;
+    var port = server.address().port;
+
+    console.log('App listening on %s on port %s', host, port);
+
+    icwsCtrl.run();
+});

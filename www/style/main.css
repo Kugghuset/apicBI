@@ -1,0 +1,42 @@
+html, body {
+  background-color: #fafafa;
+  color: #404040;
+}
+
+* {
+  box-sizing: border-box;
+  line-height: 1.4;
+  font-family: "Roboto","Helvetica","Arial",sans-serif;
+  font-weight: 300;
+  border-collapse: collapse;
+}
+
+.container {
+  width: 100%;
+  padding: 20px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+table {
+  width: 100%;
+  text-align: left;
+  table-layout: fixed;
+}
+
+th {
+  font-size: 1.2em;
+  border-bottom: 1px solid #b0b0b0;
+}
+
+td, th {
+  padding: 10px;
+}
+
+tr:not(:last-of-type) {
+  border-bottom: 1px solid #b0b0b0;
+}
+
+tr.available {
+  background-color: #90EE90;
+}

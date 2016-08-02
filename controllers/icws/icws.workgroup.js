@@ -79,6 +79,12 @@ function updateInteractions(data) {
             userName: _.get(interaction, 'attributes.Eic_UserName'),
             startDate: getDate(interaction, 'Eic_InitiationTime'),
             endDate: getDate(interaction, 'Eic_TerminationTime'),
+            queueDate: getDate(interaction, 'Eic_LineQueueTimestamp'),
+            answerDate: getDate(interaction, 'Eic_AnswerTime'),
+            // TODO: Validate these work.
+            queueTime: _.some([getDate(interaction, 'Eic_AnswerTime'), getDate(interaction, 'Eic_LineQueueTimestamp')])
+                ? getDateDiff(interaction, 'Eic_AnswerTime', 'Eic_LineQueueTimestamp')
+                : undefined,
         }, function (obj, value, key) {
             return !!value
                 ? _.assign({}, obj, _.set({}, key, value))
@@ -101,11 +107,13 @@ function updateInteractions(data) {
             state: getState(interaction),
             workgroup: _.get(interaction, 'attributes.Eic_WorkgroupName'),
             userName: _.get(interaction, 'attributes.Eic_UserName'),
-            startDate: !!_.get(interaction, 'attributes.Eic_InitiationTime')
-                ? new Date(_.get(interaction, 'attributes.Eic_InitiationTime'))
-                : undefined,
-            endDate: !!_.get(interaction, 'attributes.Eic_TerminationTime')
-                ? new Date(_.get(interaction, 'attributes.Eic_TerminationTime'))
+            startDate: getDate(interaction, 'Eic_InitiationTime'),
+            endDate: getDate(interaction, 'Eic_TerminationTime'),
+            answerDate: getDate(interaction, 'Eic_AnswerTime'),
+            queueDate: getDate(interaction, 'Eic_LineQueueTimestamp'),
+            // TODO: Validate these work.
+            queueTime: _.some([getDate(interaction, 'Eic_AnswerTime'), getDate(interaction, 'Eic_LineQueueTimestamp')])
+                ? getDateDiff(interaction, 'Eic_AnswerTime', 'Eic_LineQueueTimestamp')
                 : undefined,
         }, function (obj, value, key) {
             return !!value
@@ -266,19 +274,50 @@ function getState(interaction) {
  * @return {Date}
  */
 function getDate(interaction, dateType) {
+    var _dateString = _.get(interaction, 'attributes.' + dateType);
+
+    // If there is no value, return null.
+    if (!_dateString) {
+        return null;
+    }
+
     var _date;
 
-    if (dateType === 'Eic_InitiationTime') {
-        _date = !!_.get(interaction, 'attributes.Eic_InitiationTime')
-            ? moment(_.get(interaction, 'attributes.Eic_InitiationTime')).toDate()
-            : undefined
-    } else if (dateType === 'Eic_TerminationTime') {
-        _date = !!_.get(interaction, 'attributes.Eic_TerminationTime')
-            ? moment(_.get(interaction, 'attributes.Eic_TerminationTime')).toDate()
-            : undefined;
+    if (moment(new Date(_dateString)).isValid()) {
+        _date = new Date(_dateString);
+    } else if (moment(_dateString).isValid()) {
+        _date = moment(_dateString).toDate();
+    } else {
+        _date = _dateString;
     }
 
     return _date;
+}
+
+
+/**
+ * @param {Object} interaction The interaction object to get values from
+ * @param {String} dateType1
+ * @param {String} dateType2
+ * @return {Number}
+ */
+function getDateDiff(interaction, dateType1, dateType2, granularity) {
+    granularity = !!granularity ? granularity : 'seconds';
+
+    var _date1 = getDate(interaction, dateType1);
+    var _date2 = getDate(interaction, dateType2);
+
+    console.log('\n\n-->')
+    console.log(_date1);
+    console.log(_date2);
+    console.log((moment(_date1).diff(_date2) / 1000).toFixed(2))
+    console.log('<--\n\n')
+
+    if (!_date2) {
+        return -1;
+    }
+
+    return Math.abs(moment(_date1).diff(_date2, granularity));
 }
 
 /****************
@@ -368,6 +407,8 @@ function queueSub(action, subId, workstations) {
             'Eic_WorkgroupName',
             'Eic_InitiationTime',
             'Eic_TerminationTime',
+            'Eic_AnswerTime',
+            'Eic_LineQueueTimestamp',
             'Eic_CallId',
             'Eic_RemoteAddress',
             'Eic_RemoteId',
@@ -379,7 +420,6 @@ function queueSub(action, subId, workstations) {
             'Eic_CallType',
             'Eic_State',
             'Eic_ConnectDurationTime',
-            'Eic_RemoteTn',
         ],
         rightsFilter: 'view',
     };
@@ -407,4 +447,10 @@ function setup(subId) {
 module.exports = {
     watch: watch,
     setup: setup,
+    getInteractions: function () {
+        return {
+            activeInteractions: _activeInteractions,
+            finishedInteractions: _finishedInteractions,
+        }
+    },
 }

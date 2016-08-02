@@ -201,5 +201,7 @@ module.exports = {
     setupSubscriptions: setupSubscriptions,
     startPolling: startPolling,
     stopPolling: stopPolling,
-    run: run
+    run: run,
+    getUsers: icwsUser.getUsers,
+    getInteractions: icwsWorkgroup.getInteractions,
 };

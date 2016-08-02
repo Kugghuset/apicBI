@@ -64,6 +64,7 @@ function updateUsers(data) {
             id: _.get(user, 'configurationId.id'),
             name: _.get(user, 'configurationId.displayName'),
             statusName: _.get(user, 'statusText'),
+            lastLocalChange: new Date(),
         }
     });
 
@@ -75,6 +76,7 @@ function updateUsers(data) {
             id: _.get(user, 'configurationId.id'),
             name: _.get(user, 'configurationId.displayName'),
             statusName: _.get(user, 'statusText'),
+            lastLocalChange: new Date(),
         }
     });
 
@@ -129,7 +131,7 @@ function updateStatuses(data) {
 
         // Assign the changes to *_user* if it exists
         if (_user) {
-            _user = _.assign(_user, user);
+            _user = _.assign(_user, user, { lastLocalChange: new Date() });
             console.log('{user} changed, {status}.'.replace('{user}', _user.id).replace('{status}', _user.statusName));
         }
     });
@@ -212,4 +214,7 @@ function setup(subId) {
 module.exports = {
     watch: watch,
     setup: setup,
+    getUsers: function () {
+        return _users;
+    },
 }
