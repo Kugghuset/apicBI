@@ -19,7 +19,7 @@
     <table>
       <thead>
         <th>User name</th>
-        <th>Remote name</th>
+        <th>Remote number</th>
         <th>State</th>
         <th>Call type</th>
         <th>Start date</th>
@@ -32,7 +32,7 @@
       <tbody>
         <tr v-for="interaction in interactions">
           <td>{{ interaction.user.name || interaction.userName }}</td>
-          <td>{{ interaction.remoteName }}</td>
+          <td>{{ interaction.remoteAddress }}</td>
           <td>{{ interaction.state }}</td>
           <td>{{ interaction.callType + ' (' + (interaction.callDirection || 'missing') + ')' }}</td>
           <td>{{ interaction.startDate | date 'HH:mm:ss' }}</td>

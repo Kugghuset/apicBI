@@ -68,13 +68,14 @@ function updateInteractions(data) {
         return _.reduce({
             id: _.get(interaction, 'interactionId'),
             type: _.get(interaction, 'attributes.Eic_ObjectType'),
-            callType: _.get(interaction, 'attributes.Eic_CallType') === 'E' ? 'external' : 'intercom',
-            callDirection: _.get(interaction, 'attributes.Eic_CallDirection') === 'I' ? 'incoming' : 'outgoing',
+            callType: getCallType(interaction),
+            callDirection: getCallDirection(interaction),
             remoteAddress: _.get(interaction, 'attributes.Eic_RemoteAddress'),
             remoteId: _.get(interaction, 'attributes.Eic_RemoteId'),
             remoteName: _.get(interaction, 'attributes.Eic_RemoteName'),
             duration: _.get(interaction, 'attributes.Eic_ConnectDurationTime'),
             state: getState(interaction),
+            stateVal: _.get(interaction, 'attributes.Eic_State'),
             workgroup: _.get(interaction, 'attributes.Eic_WorkgroupName'),
             userName: _.get(interaction, 'attributes.Eic_UserName'),
             startDate: getDate(interaction, 'Eic_InitiationTime'),
@@ -95,13 +96,14 @@ function updateInteractions(data) {
         return _.reduce({
             id: _.get(interaction, 'interactionId'),
             type: _.get(interaction, 'attributes.Eic_ObjectType'),
-            callType: _.get(interaction, 'attributes.Eic_CallType') === 'E' ? 'external' : 'intercom',
-            callDirection: _.get(interaction, 'attributes.Eic_CallDirection') === 'I' ? 'incoming' : 'outgoing',
+            callType: getCallType(interaction),
+            callDirection: getCallDirection(interaction),
             remoteAddress: _.get(interaction, 'attributes.Eic_RemoteAddress'),
             remoteId: _.get(interaction, 'attributes.Eic_RemoteId'),
             remoteName: _.get(interaction, 'attributes.Eic_RemoteName'),
             duration: _.get(interaction, 'attributes.Eic_ConnectDurationTime'),
             state: getState(interaction),
+            stateVal: _.get(interaction, 'attributes.Eic_State'),
             workgroup: _.get(interaction, 'attributes.Eic_WorkgroupName'),
             userName: _.get(interaction, 'attributes.Eic_UserName'),
             startDate: getDate(interaction, 'Eic_InitiationTime'),
@@ -268,11 +270,42 @@ function getState(interaction) {
     } else if (_.get(interaction, 'attributes.Eic_State') === 'S') {
         _state = 'Dialing';
     } else {
-        console.log(_.get(interaction, 'attributes.Eic_State'));
-        _state = 'Unknown';
+        _state = undefined;
     }
 
     return _state;
+}
+
+/**
+ * @param {Object} interaction The interaction object returned from ININ
+ * @return {String} The call type as a readable string.
+ */
+function getCallType(interaction) {
+    var callType = _.get(interaction, 'attributes.Eic_CallType');// === 'E' ? 'external' : 'intercom',
+
+    if (callType === 'E') {
+        return 'external';
+    } else if (callType === 'I') {
+        return 'intercom';
+    } else {
+        return undefined;
+    }
+}
+
+/**
+ * @param {Object} interaction The interaction object returned from ININ
+ * @return {String} The call direction as a readable string.
+ */
+function getCallDirection(interaction) {
+    var callDirection = _.get(interaction, 'attributes.Eic_CallDirection');
+
+    if (callDirection === 'I') {
+        return 'inbound';
+    } else if (callDirection === 'O') {
+        return 'outbound';
+    } else {
+        return undefined;
+    }
 }
 
 /**
@@ -422,7 +455,6 @@ function queueSub(action, subId, workstations) {
             'Eic_RemoteId',
             'Eic_RemoteName',
             'Eic_UserName',
-            'Eic_CallStateString',
             'Eic_CallDirection',
             'Eic_ObjectType',
             'Eic_CallType',
