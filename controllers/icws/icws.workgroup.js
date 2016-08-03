@@ -20,9 +20,21 @@ var _typeIds = {
     updateWorkstations: 'urn:inin.com:configuration.people:workgroupsMessage',
 };
 
-var _workstations = [];
-var _activeInteractions = [];
-var _finishedInteractions = [];
+var __workstations = [];
+var __activeInteractions = [];
+var __finishedInteractions = [];
+
+/**
+ * The differance in milliseconds in comparison to the server.
+ *
+ * @type Number
+ */
+var __localTimeDiff = null;
+
+/**
+ * The item which has been queueing the longest.
+ */
+var __longestQueueItem = { queueTime: 0, id: null, timeDiff: 0 };
 
 /**
  * All watcher methods, exactly matching the keys of _typeIds
@@ -55,6 +67,9 @@ function watch(dataArr) {
         // Call the function if it's defined
         if (_.isFunction(watchers[key])) { watchers[key](val); }
     });
+
+    _.forEach(__activeInteractions, updateActiveTime);
+    updateLongestQueue();
 }
 
 /**
@@ -83,6 +98,7 @@ function updateInteractions(data) {
             queueDate: getDate(interaction, 'Eic_LineQueueTimestamp'),
             answerDate: getDate(interaction, 'Eic_AnswerTime'),
             connectedDate: getDate(interaction, 'Eic_ConnectTime'),
+            referenceDate: new Date(),
         }, function (obj, value, key) {
             return !!value
                 ? _.assign({}, obj, _.set({}, key, value))
@@ -125,14 +141,17 @@ function updateInteractions(data) {
     // Handle added interactions
     if (_.some(_added)) {
         // Add them all
-        _activeInteractions = _activeInteractions.concat(_.map(_added, function (interaction) {
+        __activeInteractions = __activeInteractions.concat(_.map(_added, function (interaction) {
             // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
             if (_.isUndefined(interaction.queueTime) && !_.some([interaction.queueDate, interaction.connectedDate], _.isUndefined)) {
-                interaction.queueTime = Math.abs(moment(interaction.queueDate).diff(interaction.connectedDate, 'seconds'));
+                interaction.queueTime = getDateDiff(interaction.queueDate, interaction.connectedDate, 'seconds');
             }
 
             return interaction;
         }));
+
+        // Try to update the local timeDiff
+        _.forEach(_added, updateLocalTimeDiff);
 
         console.log('\nAdded interactions:');
         console.log(JSON.stringify(_added, null, 4));
@@ -144,21 +163,21 @@ function updateInteractions(data) {
     // Handle changes
     if (_.some(_changed)) {
         _.forEach(_changed, function (interaction) {
-            var _interaction = _.find(_activeInteractions, { id: interaction.id });
+            var _interaction = _.find(__activeInteractions, { id: interaction.id });
             // Update the interaction
             if (_interaction) {
                 // Get the position of the item
-                var _index = _.indexOf(_activeInteractions, _interaction);
+                var _index = _.indexOf(__activeInteractions, _interaction);
                 // Merge the objects
                 var _updated = _.assign({}, _interaction, interaction);
 
                 // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
                 if (_.isUndefined(_updated.queueTime) && !_.some([_updated.queueDate, _updated.connectedDate], _.isUndefined)) {
-                    _updated.queueTime = Math.abs(moment(_updated.queueDate).diff(_updated.connectedDate, 'seconds'));
+                    _updated.queueTime = getDateDiff(_updated.queueDate, _updated.connectedDate, 'seconds');
                 }
 
                 // Splice in the updated version instead of the original item
-                _activeInteractions.splice(_index, 1, _updated);
+                __activeInteractions.splice(_index, 1, _updated);
             }
         });
 
@@ -171,8 +190,8 @@ function updateInteractions(data) {
 
     // Handle removed interactions
     if (_.some(_removed)) {
-        var _removedItems = _.remove(_activeInteractions, function (interaction) { return !!~_removed.indexOf(interaction.id); });
-        _finishedInteractions.concat(_removedItems);
+        var _removedItems = _.remove(__activeInteractions, function (interaction) { return !!~_removed.indexOf(interaction.id); });
+        __finishedInteractions.concat(_removedItems);
         console.log('\nRemoved interactions:');
         console.log(JSON.stringify(_removedItems, null, 4));
 
@@ -216,7 +235,7 @@ function updateWorkstations(data) {
 
     if (_.some([_added, _changed, _removed]), _.some) {
         // Update _workStations
-        _workstations = _.chain(_workstations)
+        __workstations = _.chain(__workstations)
             // Filter out removed workstations
             .filter(function (workstation) { return !!~_removed.indexOf(workstation); })
             // Filter out any modified workstations
@@ -225,7 +244,7 @@ function updateWorkstations(data) {
             .thru(function (workstations) { return workstations.concat(_added, _changed); })
             .value();
 
-        console.log('There are now {num} workstations!'.replace('{num}', _workstations.length));
+        console.log('There are now {num} workstations!'.replace('{num}', __workstations.length));
 
         // Get the ids to added workstations, if any, subscribe to their queues
         var _addedIds = _.map(_added, 'id');
@@ -341,23 +360,100 @@ function getDate(interaction, dateType) {
  * @param {String} dateType2
  * @return {Number}
  */
-function getDateDiff(interaction, dateType1, dateType2, granularity) {
+function getDateDiff(date1, date2, granularity, skipAbs) {
+    skipAbs = _.isBoolean(skipAbs) ? skipAbs : false;
+
     granularity = !!granularity ? granularity : 'seconds';
 
-    var _date1 = getDate(interaction, dateType1);
-    var _date2 = getDate(interaction, dateType2);
-
-    console.log('\n\n-->')
-    console.log(_date1);
-    console.log(_date2);
-    console.log((moment(_date1).diff(_date2) / 1000).toFixed(2))
-    console.log('<--\n\n')
-
-    if (!_date2) {
+    if (!date2) {
         return -1;
     }
 
-    return Math.abs(moment(_date1).diff(_date2, granularity));
+    return skipAbs
+        ? moment(date1).diff(date2, granularity)
+        : Math.abs(moment(date1).diff(date2, granularity));
+}
+
+/**
+ * Updates the local time differance variable if it's either null or higher
+ * than the diff between startDate and referenceDate of *interaction*.
+ *
+ * @param {Object} interaction The interaction object to get values from
+ */
+function updateLocalTimeDiff(interaction) {
+    //  Get the differance
+    var _timeDiffStart = getDateDiff(interaction.referenceDate, interaction.startDate, 'milliseconds', true);
+    var _timeDiffEnd = !_.isUndefined(interaction.endDate) ? null : getDateDiff(interaction.referenceDate, interaction.endDate, 'milliseconds', true);
+
+    var currentLocalDiff = __localTimeDiff;
+
+    // If __localTimeDiff is null or higher, correct it with _timeDiff
+    if (_.isNull(__localTimeDiff) || Math.abs(_timeDiffStart) < Math.abs(__localTimeDiff)) {
+        __localTimeDiff = _timeDiffStart;
+    }
+
+    if (!_.isNull(_timeDiffEnd) && Math.abs(_timeDiffEnd) < Math.abs(__localTimeDiff)) {
+        __localTimeDiff = _timeDiffEnd;
+    }
+
+    if (currentLocalDiff !== __localTimeDiff) {
+        console.log('Local time differance updated to: {timediff} ms'.replace('{timediff}', __localTimeDiff));
+    }
+}
+
+/**
+ * @param {Object} interaction The interaction object to get values from
+ * @param {Number} index Index of the interaction
+ */
+function updateActiveTime(interaction, index) {
+    // Get the time diff from
+    var activeTime = getDateDiff(interaction.referenceDate, new Date());
+
+    var _queueTime = _.every([
+        !_.isNumber(interaction.queueTime),
+        !_.isDate(interaction.endDate),
+        interaction.callDirection == 'inbound'
+    ]) ? getInteractionQueueTime(interaction) : interaction.queueTime || 0;
+
+    // Update the activeTime
+    var _updated = _.assign(interaction, { activeTime: activeTime, _queueTime: _queueTime });
+
+    __activeInteractions.splice(index, 1, _updated);
+}
+
+/**
+ * Updates the longest queue time and ID.
+ */
+function updateLongestQueue() {
+    __longestQueueItem = _.chain(__activeInteractions)
+        .filter(function (interaction) { return !_.isNumber(interaction.queueTime) })
+        .filter(function (interaction) { return !_.isDate(interaction.endDate) })
+        .filter(function (interaction) { return interaction.callDirection === 'inbound' })
+        .map(function (interaction) { return _.assign({}, interaction, { _queueTime: getInteractionQueueTime(interaction) }) })
+        .orderBy('_queueTime', 'desc')
+        .first()
+        .thru(function (interaction) { return _.isUndefined(interaction) ? { id: null, queueTime: 0 } : { id: interaction.id, queueTime: interaction._queueTime } })
+        .thru(function (item) { return _.assign({}, item, { timeDiff: __localTimeDiff }) })
+        .value();
+}
+
+/**
+ *
+ * @param {Object} interaction The interaction object to get values from
+ * @return {Number}
+ */
+function getInteractionQueueTime(interaction) {
+    // Should be less than.
+    var _timeDiff = getDateDiff(interaction.referenceDate, interaction.queueDate, 'milliseconds', true);
+
+    /**
+     * TODO: Validate this works
+     */
+
+    console.log(_timeDiff);
+
+    // return Math.abs(moment(interaction.queueDate).subtract(__localTimeDiff, 'milliseconds').diff(new Date(), 'seconds'))
+    return moment(new Date()).subtract(_timeDiff, 'milliseconds').diff(interaction.queueDate, 'seconds')
 }
 
 /****************
@@ -386,7 +482,6 @@ function workStationSub(action, subId) {
             configurationIds: [
                 '*',
                 'CSA',
-                // 'Partner Service',
             ],
             properties: [
                 'hasQueue',
@@ -489,8 +584,11 @@ module.exports = {
     setup: setup,
     getInteractions: function () {
         return {
-            activeInteractions: _activeInteractions,
-            finishedInteractions: _finishedInteractions,
+            activeInteractions: __activeInteractions,
+            finishedInteractions: __finishedInteractions,
         }
+    },
+    getLongestQueueItem: function () {
+        return __longestQueueItem;
     },
 }

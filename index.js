@@ -30,6 +30,12 @@ router.get('/interactions', function (req, res) {
   res.status(200).json(interactions);
 });
 
+router.get('/longest-queue', function (req, res) {
+  var longestQueue = icwsCtrl.getLongestQueueItem();
+
+  res.status(200).json(longestQueue);
+})
+
 app.use(router);
 
 var server = app.listen(5000, 'localhost', function () {

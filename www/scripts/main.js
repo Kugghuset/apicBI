@@ -14,6 +14,7 @@ var app = new Vue({
     return {
       users: [],
       interactions: [],
+      longestQueueItem: { id: null, queueTime: 0, timeDiff: 0 },
     };
   },
   computed: {
@@ -26,12 +27,18 @@ var app = new Vue({
       return user.loggedIn && !user.onPhone && user.statusName === 'Available';
     },
     formatTimer: function (s) {
+      var isNegative = s < 0;
+
+      if (isNegative) {
+        s = Math.abs(s);
+      }
+
       var seconds = Math.floor(s);
       var minutes = Math.floor(s / 60);
       var hours = Math.floor(s / 60 / 60);
       // var days = Math.floor(ms /  1000 / 60 / 60 / 24);
 
-      return [
+      return (isNegative ? '-' : '') + [
         ('0' + hours % 24).slice(-2),
         ':',
         ('0' + minutes % 60).slice(-2),
@@ -72,6 +79,14 @@ var app = new Vue({
             console.log(JSON.parse(JSON.stringify(this.interactions)))
           }, function (err) {
             console.log(err);
+          });
+
+        this.$http.get('/longest-queue')
+        .then(
+          function (response) {
+            this.longestQueueItem = response.data;
+          }, function (err) {
+            console.log(err)
           });
 
     }.bind(this), 1000);

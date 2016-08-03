@@ -23,6 +23,7 @@
         <th>State</th>
         <th>Call type</th>
         <th>Start date</th>
+        <th>Reference date</th>
         <th>End date</th>
         <th>Duration (seconds)</th>
         <th>Date queued</th>
@@ -36,16 +37,19 @@
           <td>{{ interaction.state }}</td>
           <td>{{ interaction.callType + ' (' + (interaction.callDirection || 'missing') + ')' }}</td>
           <td>{{ interaction.startDate | date 'HH:mm:ss' }}</td>
+          <td>{{ interaction.referenceDate | date 'HH:mm:ss' }}</td>
           <td>{{ interaction.endDate | date 'HH:mm:ss' }}</td>
           <td>{{ interaction.duration > 0 ? formatTimer(interaction.duration) : 'pending' }}</td>
           <td>{{ interaction.queueDate | date 'YYYY-MM-DD HH:mm:ss' }}</td>
           <td>{{ interaction.connectedDate | date 'YYYY-MM-DD HH:mm:ss' }}</td>
-          <td>{{ interaction.queueTime > 0 ? formatTimer(interaction.queueTime) : 'in queue' }}</td>
+          <td>{{ interaction.queueTime > 0 ? formatTimer(interaction.queueTime) : formatTimer(interaction._queueTime) }}</td>
         </tr>
       </tbody>
     </table>
 
-    <h1>{{ _availableUsers.length }} available users</h1>
+    <h1>Current queueTime is {{ formatTimer(longestQueueItem.queueTime) }}, with the diff {{ formatTimer(longestQueueItem.timeDiff / 1000) }} ({{ longestQueueItem.timeDiff / 1000 }})</h1>
+
+    <h1>{{ _availableUsers.length }} available agents</h1>
 
     <table>
       <thead>
