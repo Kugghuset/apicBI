@@ -81,10 +81,7 @@ function updateInteractions(data) {
             endDate: getDate(interaction, 'Eic_TerminationTime'),
             queueDate: getDate(interaction, 'Eic_LineQueueTimestamp'),
             answerDate: getDate(interaction, 'Eic_AnswerTime'),
-            // TODO: Validate these work.
-            queueTime: _.some([getDate(interaction, 'Eic_AnswerTime'), getDate(interaction, 'Eic_LineQueueTimestamp')])
-                ? getDateDiff(interaction, 'Eic_AnswerTime', 'Eic_LineQueueTimestamp')
-                : undefined,
+            connectedDate: getDate(interaction, 'Eic_ConnectTime'),
         }, function (obj, value, key) {
             return !!value
                 ? _.assign({}, obj, _.set({}, key, value))
@@ -109,12 +106,9 @@ function updateInteractions(data) {
             userName: _.get(interaction, 'attributes.Eic_UserName'),
             startDate: getDate(interaction, 'Eic_InitiationTime'),
             endDate: getDate(interaction, 'Eic_TerminationTime'),
-            answerDate: getDate(interaction, 'Eic_AnswerTime'),
             queueDate: getDate(interaction, 'Eic_LineQueueTimestamp'),
-            // TODO: Validate these work.
-            queueTime: _.some([getDate(interaction, 'Eic_AnswerTime'), getDate(interaction, 'Eic_LineQueueTimestamp')])
-                ? getDateDiff(interaction, 'Eic_AnswerTime', 'Eic_LineQueueTimestamp')
-                : undefined,
+            answerDate: getDate(interaction, 'Eic_AnswerTime'),
+            connectedDate: getDate(interaction, 'Eic_ConnectTime'),
         }, function (obj, value, key) {
             return !!value
                 ? _.assign({}, obj, _.set({}, key, value))
@@ -129,7 +123,14 @@ function updateInteractions(data) {
     // Handle added interactions
     if (_.some(_added)) {
         // Add them all
-        _activeInteractions = _activeInteractions.concat(_added);
+        _activeInteractions = _activeInteractions.concat(_.map(_added, function (interaction) {
+            // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
+            if (_.isUndefined(interaction.queueTime) && !_.some([interaction.queueDate, interaction.connectedDate], _.isUndefined)) {
+                interaction.queueTime = Math.abs(moment(interaction.queueDate).diff(interaction.connectedDate, 'seconds'));
+            }
+
+            return interaction;
+        }));
 
         console.log('\nAdded interactions:');
         console.log(JSON.stringify(_added, null, 4));
@@ -148,6 +149,12 @@ function updateInteractions(data) {
                 var _index = _.indexOf(_activeInteractions, _interaction);
                 // Merge the objects
                 var _updated = _.assign({}, _interaction, interaction);
+
+                // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
+                if (_.isUndefined(_updated.queueTime) && !_.some([_updated.queueDate, _updated.connectedDate], _.isUndefined)) {
+                    _updated.queueTime = Math.abs(moment(_updated.queueDate).diff(_updated.connectedDate, 'seconds'));
+                }
+
                 // Splice in the updated version instead of the original item
                 _activeInteractions.splice(_index, 1, _updated);
             }
@@ -408,6 +415,7 @@ function queueSub(action, subId, workstations) {
             'Eic_InitiationTime',
             'Eic_TerminationTime',
             'Eic_AnswerTime',
+            'Eic_ConnectTime',
             'Eic_LineQueueTimestamp',
             'Eic_CallId',
             'Eic_RemoteAddress',

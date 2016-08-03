@@ -25,7 +25,9 @@
         <th>Start date</th>
         <th>End date</th>
         <th>Duration (seconds)</th>
-        <th>Queue timestamp</th>
+        <th>Date queued</th>
+        <th>Date connected</th>
+        <th>Time in queue</th>
       </thead>
       <tbody>
         <tr v-for="interaction in interactions">
@@ -36,7 +38,9 @@
           <td>{{ interaction.startDate | date 'HH:mm:ss' }}</td>
           <td>{{ interaction.endDate | date 'HH:mm:ss' }}</td>
           <td>{{ interaction.duration > 0 ? formatTimer(interaction.duration) : 'pending' }}</td>
-          <td>{{ interaction.Eic_LineQueueTimestamp | date 'YYYY-MM-DD HH:mm:ss' }}</td>
+          <td>{{ interaction.queueDate | date 'YYYY-MM-DD HH:mm:ss' }}</td>
+          <td>{{ interaction.connectedDate | date 'YYYY-MM-DD HH:mm:ss' }}</td>
+          <td>{{ interaction.queueTime > 0 ? formatTimer(interaction.queueTime) : 'in queue' }}</td>
         </tr>
       </tbody>
     </table>
