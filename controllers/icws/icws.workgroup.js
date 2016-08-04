@@ -27,14 +27,27 @@ var __finishedInteractions = [];
 /**
  * The differance in milliseconds in comparison to the server.
  *
- * @type Number
+ * @type {Number}
  */
 var __localTimeDiff = null;
 
 /**
- * The item which has been queueing the longest.
+ * Array of time diffs between queueTime based on ININ data (queueDate - connectedDate)
+ * and calculated queue time (__queueTime).
+ *
+ * Used for better handle current queue time.
+ *
+ * __localTimeDiff should be set to the mean value of the current day's diff.
+ *
+ * @type {Number[]}
  */
-var __longestQueueItem = { queueTime: 0, id: null, timeDiff: 0 };
+var __timeDiffs = [];
+
+/**
+ * The item which has been queueing the longest.
+ * @type {{ queueTime: Number, queueLength: Number, id: Number }}
+ */
+var __longestQueueItem = { queueTime: 0, id: null, queueLength: 0 };
 
 /**
  * All watcher methods, exactly matching the keys of _typeIds
@@ -68,8 +81,8 @@ function watch(dataArr) {
         if (_.isFunction(watchers[key])) { watchers[key](val); }
     });
 
-    _.forEach(__activeInteractions, updateActiveTime);
-    updateLongestQueue();
+    _.forEach(__activeInteractions, updateCalculatedValues);
+    updateQueueInfo();
 }
 
 /**
@@ -149,9 +162,6 @@ function updateInteractions(data) {
 
             return interaction;
         }));
-
-        // Try to update the local timeDiff
-        _.forEach(_added, updateLocalTimeDiff);
 
         console.log('\nAdded interactions:');
         console.log(JSON.stringify(_added, null, 4));
@@ -402,38 +412,70 @@ function updateLocalTimeDiff(interaction) {
 }
 
 /**
+ * Updates *interaction* with the following properties:
+ * - inQueue (boolean value of whether the *interaction* is in queue or not.)
+ * - _queueTime (calculated time diff between queueDate and Date.now or the actual queueTime (connectedDate - queueDate))
+ * - __queueTime (calculated between queueDate and now, only set when the diff won't grow)
+ *
  * @param {Object} interaction The interaction object to get values from
  * @param {Number} index Index of the interaction
  */
-function updateActiveTime(interaction, index) {
-    // Get the time diff from
-    var activeTime = getDateDiff(interaction.referenceDate, new Date());
+function updateCalculatedValues(interaction, index) {
+    // Create a variable for _queueTime to be used.
+    var _queueTime;
 
-    var _queueTime = _.every([
-        !_.isNumber(interaction.queueTime),
-        !_.isDate(interaction.endDate),
-        interaction.callDirection == 'inbound'
-    ]) ? getInteractionQueueTime(interaction) : interaction.queueTime || 0;
+    // Update the inQueue property
+    if (inQueue(interaction) && !interaction.inQueue) {
+        interaction.inQueue = true;
+    } else if (!inQueue(interaction) && interaction.inQueue) {
+        interaction.inQueue = false;
+    }
+
+    // Set _queueTime to either the time diff returned form getInteractionQueueTime or the actual queueTime.
+    if (interaction.inQueue) {
+        _queueTime = getInteractionQueueTime(interaction);
+    } else {
+        _queueTime = interaction.queueTime || 0;
+    }
 
     // Update the activeTime
-    var _updated = _.assign(interaction, { activeTime: activeTime, _queueTime: _queueTime });
+    var _updated = _.assign(interaction, { _queueTime: _queueTime });
 
+    // If __queueTime (calculated queueTime) is undefined and the *interaction* is not in queue, set __queueTime.
+    if (_.isUndefined(_updated.__queueTime) && !interaction.inQueue) {
+        interaction.__queueTime = getInteractionQueueTime(interaction);
+
+        // Push the diff to __timeDiffs to store it.
+        __timeDiffs.push(interaction.__queueTime - interaction._queueTime);
+    }
+
+    // Replace the item in the list.
     __activeInteractions.splice(index, 1, _updated);
+}
+
+/**
+ * @param {Object} interaction The interaction object to get values from
+ * @return {Boolean} Whether the *interaction* is assumed to be in queue or not.
+ */
+function inQueue(interaction) {
+    return !_.some([
+        _.isNumber(interaction.queueTime),
+        _.isDate(interaction.endDate),
+        interaction.callDirection !== 'inbound'
+    ]);
 }
 
 /**
  * Updates the longest queue time and ID.
  */
-function updateLongestQueue() {
+function updateQueueInfo() {
     __longestQueueItem = _.chain(__activeInteractions)
-        .filter(function (interaction) { return !_.isNumber(interaction.queueTime) })
-        .filter(function (interaction) { return !_.isDate(interaction.endDate) })
-        .filter(function (interaction) { return interaction.callDirection === 'inbound' })
+        .filter(function (interaction) { return interaction.inQueue; })
         .map(function (interaction) { return _.assign({}, interaction, { _queueTime: getInteractionQueueTime(interaction) }) })
         .orderBy('_queueTime', 'desc')
+        .thru(function (interactions) { return _.map(interactions, function (interaction) { return _.assign({}, interaction, { queueLength: interactions.length }); }); })
         .first()
-        .thru(function (interaction) { return _.isUndefined(interaction) ? { id: null, queueTime: 0 } : { id: interaction.id, queueTime: interaction._queueTime } })
-        .thru(function (item) { return _.assign({}, item, { timeDiff: __localTimeDiff }) })
+        .thru(function (interaction) { return _.isUndefined(interaction) ? { id: null, queueTime: 0, queueLength: 0 } : { id: interaction.id, queueTime: interaction._queueTime, queueLength: interaction.queueLength } })
         .value();
 }
 
@@ -447,13 +489,12 @@ function getInteractionQueueTime(interaction) {
     var _timeDiff = getDateDiff(interaction.referenceDate, interaction.queueDate, 'milliseconds', true);
 
     /**
-     * TODO: Validate this works
+     * TODO:
+     * - Potentially add the time diff between __queueTime and (actual) queueTime to the diff
+     *   for a closer value.
      */
 
-    console.log(_timeDiff);
-
-    // return Math.abs(moment(interaction.queueDate).subtract(__localTimeDiff, 'milliseconds').diff(new Date(), 'seconds'))
-    return moment(new Date()).subtract(_timeDiff, 'milliseconds').diff(interaction.queueDate, 'seconds')
+    return moment(new Date()).diff(interaction.queueDate, 'seconds');
 }
 
 /****************

@@ -14,7 +14,8 @@ var app = new Vue({
     return {
       users: [],
       interactions: [],
-      longestQueueItem: { id: null, queueTime: 0, timeDiff: 0 },
+      longestQueueItem: { id: null, queueTime: 0, queueLength: 0 },
+      currentTime: moment().diff(moment().startOf('day'), 'seconds'),
     };
   },
   computed: {
@@ -88,6 +89,8 @@ var app = new Vue({
           }, function (err) {
             console.log(err)
           });
+
+      this.currentTime = moment().diff(moment().startOf('day'), 'seconds');
 
     }.bind(this), 1000);
   },

@@ -28,10 +28,11 @@
         <th>Duration (seconds)</th>
         <th>Date queued</th>
         <th>Date connected</th>
-        <th>Time in queue</th>
+        <th>Time queued</th>
+        <th>Calc. time queued</th>
       </thead>
       <tbody>
-        <tr v-for="interaction in interactions">
+        <tr v-for="interaction in interactions | orderBy 'queueDate'">
           <td>{{ interaction.user.name || interaction.userName }}</td>
           <td>{{ interaction.remoteAddress }}</td>
           <td>{{ interaction.state }}</td>
@@ -42,12 +43,15 @@
           <td>{{ interaction.duration > 0 ? formatTimer(interaction.duration) : 'pending' }}</td>
           <td>{{ interaction.queueDate | date 'YYYY-MM-DD HH:mm:ss' }}</td>
           <td>{{ interaction.connectedDate | date 'YYYY-MM-DD HH:mm:ss' }}</td>
-          <td>{{ interaction.queueTime > 0 ? formatTimer(interaction.queueTime) : formatTimer(interaction._queueTime) }}</td>
+          <td>{{ interaction.queueTime > 0 ? formatTimer(interaction.queueTime) : (!!interaction.endDate ? 'dropped out' : 'in queue') }}</td>
+          <td>{{ interaction.__queueTime > 0 ? formatTimer(interaction.__queueTime) : formatTimer(interaction._queueTime) }}</td>
         </tr>
       </tbody>
     </table>
 
-    <h1>Current queueTime is {{ formatTimer(longestQueueItem.queueTime) }}, with the diff {{ formatTimer(longestQueueItem.timeDiff / 1000) }} ({{ longestQueueItem.timeDiff / 1000 }})</h1>
+    <h1>Current queue time is {{ formatTimer(longestQueueItem.queueTime) }} ({{ longestQueueItem.queueLength }} calls in queue)</h1>
+
+    <h1>Current time: {{ formatTimer(currentTime) }}</h1>
 
     <h1>{{ _availableUsers.length }} available agents</h1>
 
