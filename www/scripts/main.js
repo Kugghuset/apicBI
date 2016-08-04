@@ -25,7 +25,12 @@ var app = new Vue({
   },
   methods: {
     isAvailable(user) {
-      return user.loggedIn && !user.onPhone && user.statusName === 'Available';
+      return [
+        user.loggedIn,
+        !user.onPhone,
+        user.statusName === 'Available',
+        user.workgroups.some(function (workgroup) { return !!~['Partner Service', 'CSA'].indexOf(workgroup.name) })
+      ].every(function (val) { return val; });
     },
     formatTimer: function (s) {
       var isNegative = s < 0;
@@ -46,8 +51,10 @@ var app = new Vue({
         ':',
         ('0' + seconds % 60).slice(-2),
       ].join('');
+    },
+    getWorkgroups: function (user) {
+      return user.workgroups.map(function (data) { return data.name }).join(', ');
     }
-
   },
   ready() {
     setInterval(function () {
@@ -59,7 +66,8 @@ var app = new Vue({
         function (response) {
           this.users = response
             .data
-            .map(function (user) { return user; });
+            .map(function (user) { return user; })
+            .filter(function (user) { return user.loggedIn })
         }, function (err) {
           console.log(err);
         });
@@ -72,12 +80,10 @@ var app = new Vue({
           function (response) {
             this.interactions = (response.data.activeInteractions || [])
               .map(function (interaction) {
-                var user = (this.users.filter(function (usr) { return usr.id === interaction.userName; }) || [])[0]
+                var user = (this.users.filter(function (usr) { return usr.id === interaction.userName; }) || [])[0];
 
                 return Object.assign({}, interaction, { user: user })
               }.bind(this));
-
-            console.log(JSON.parse(JSON.stringify(this.interactions)))
           }, function (err) {
             console.log(err);
           });

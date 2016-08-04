@@ -65,6 +65,7 @@ function updateUsers(data) {
             name: _.get(user, 'configurationId.displayName'),
             statusName: _.get(user, 'statusText'),
             lastLocalChange: new Date(),
+            workgroups: _.map(_.get(user, 'workgroups'), function (wg) { return { id: wg.id, name: wg.displayName } }),
         }
     });
 
@@ -77,6 +78,7 @@ function updateUsers(data) {
             name: _.get(user, 'configurationId.displayName'),
             statusName: _.get(user, 'statusText'),
             lastLocalChange: new Date(),
+            workgroups: _.map(_.get(user, 'workgroups'), function (wg) { return { id: wg.id, name: wg.displayName } }),
         }
     });
 
@@ -170,7 +172,8 @@ function userListSub(action, subId) {
                 'personalInformationProperties.surname',
                 'clientConfigDateLastModified',
                 'lastModifiedDate',
-                'statusText'
+                'statusText',
+                'workgroups',
             ],
             rightsFilter: 'view'
         });

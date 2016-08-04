@@ -20,6 +20,7 @@
       <thead>
         <th>User name</th>
         <th>Remote number</th>
+        <th>Workgroup</th>
         <th>State</th>
         <th>Call type</th>
         <th>Start date</th>
@@ -35,6 +36,7 @@
         <tr v-for="interaction in interactions | orderBy 'queueDate'">
           <td>{{ interaction.user.name || interaction.userName }}</td>
           <td>{{ interaction.remoteAddress }}</td>
+          <td>{{ interaction.workgroup }}</td>
           <td>{{ interaction.state }}</td>
           <td>{{ interaction.callType + ' (' + (interaction.callDirection || 'missing') + ')' }}</td>
           <td>{{ interaction.startDate | date 'HH:mm:ss' }}</td>
@@ -43,7 +45,7 @@
           <td>{{ interaction.duration > 0 ? formatTimer(interaction.duration) : 'pending' }}</td>
           <td>{{ interaction.queueDate | date 'YYYY-MM-DD HH:mm:ss' }}</td>
           <td>{{ interaction.connectedDate | date 'YYYY-MM-DD HH:mm:ss' }}</td>
-          <td>{{ interaction.queueTime > 0 ? formatTimer(interaction.queueTime) : (!!interaction.endDate ? 'dropped out' : 'in queue') }}</td>
+          <td>{{ interaction.queueTime > 0 ? formatTimer(interaction.queueTime) : (!!interaction.endDate ? 'abandoned call' : 'in queue') }}</td>
           <td>{{ interaction.__queueTime > 0 ? formatTimer(interaction.__queueTime) : formatTimer(interaction._queueTime) }}</td>
         </tr>
       </tbody>
@@ -61,6 +63,7 @@
         <th colspan="4">Status</th>
         <th colspan="2">On phone</th>
         <th colspan="2">Logged in</th>
+        <th colspan="3">Workgroups</th>
         <th colspan="4">Last change</th>
       </thead>
       <tbody>
@@ -69,6 +72,7 @@
           <td colspan="4">{{ user.statusName }}</td>
           <td colspan="2">{{ user.onPhone }}</td>
           <td colspan="2">{{ user.loggedIn }}</td>
+          <td colspan="3">{{ getWorkgroups(user) }}</td>
           <td colspan="4">{{ user.lastLocalChange | date 'HH:mm:ss' }}</td>
         </tr>
       </tbody>

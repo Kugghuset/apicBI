@@ -567,9 +567,10 @@ function queueSub(action, subId, workstations) {
             // Filter out any not of interest workstations
             return !!~[
                 'CSA',
-                // 'Partner Service',
+                'Partner Service',
             ].indexOf(item.queueName);
         })
+        // .uniqBy('queueType')
         .value();
 
     var _subPath = 'messaging/subscriptions/queues/:id'
