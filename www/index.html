@@ -31,6 +31,7 @@
         <th>Date connected</th>
         <th>Time queued</th>
         <th>Calc. time queued</th>
+        <th>Is abandoned</th>
       </thead>
       <tbody>
         <tr v-for="interaction in interactions | orderBy 'queueDate'">
@@ -47,11 +48,16 @@
           <td>{{ interaction.connectedDate | date 'YYYY-MM-DD HH:mm:ss' }}</td>
           <td>{{ interaction.queueTime > 0 ? formatTimer(interaction.queueTime) : (!!interaction.endDate ? 'abandoned call' : 'in queue') }}</td>
           <td>{{ interaction.__queueTime > 0 ? formatTimer(interaction.__queueTime) : formatTimer(interaction._queueTime) }}</td>
+          <td>{{ !!interaction.abandoned ? interaction.abandoned : false }}</td>
         </tr>
       </tbody>
     </table>
 
-    <h1>Current queue time is {{ formatTimer(longestQueueItem.queueTime) }} ({{ longestQueueItem.queueLength }} calls in queue)</h1>
+    <h1>Current queue time is {{ formatTimer(queueInfo.queueTime) }} ({{ queueInfo.queueLength }} calls in queue)</h1>
+
+    <h1>Number of abandoned calls: {{ queueInfo.abandonedLength }}</h1>
+    <h1>Number of completed calls: {{ queueInfo.completedLength }}</h1>
+    <h1>Abandon rate is {{ queueInfo.abandonRate }} %</h1>
 
     <h1>Current time: {{ formatTimer(currentTime) }}</h1>
 

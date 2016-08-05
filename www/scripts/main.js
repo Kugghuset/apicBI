@@ -14,7 +14,7 @@ var app = new Vue({
     return {
       users: [],
       interactions: [],
-      longestQueueItem: { id: null, queueTime: 0, queueLength: 0 },
+      queueInfo: { id: null, queueTime: 0, queueLength: 0, abandonedLength: 0, completedLength: 0, abandonRate: 0 },
       currentTime: moment().diff(moment().startOf('day'), 'seconds'),
     };
   },
@@ -88,10 +88,13 @@ var app = new Vue({
             console.log(err);
           });
 
-        this.$http.get('/longest-queue')
+        this.$http.get('/queue-info')
         .then(
           function (response) {
-            this.longestQueueItem = response.data;
+            this.queueInfo = response.data;
+
+            console.log(JSON.parse(JSON.stringify(this.queueInfo)))
+
           }, function (err) {
             console.log(err)
           });

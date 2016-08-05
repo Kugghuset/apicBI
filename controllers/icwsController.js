@@ -204,5 +204,5 @@ module.exports = {
     run: run,
     getUsers: icwsUser.getUsers,
     getInteractions: icwsWorkgroup.getInteractions,
-    getLongestQueueItem: icwsWorkgroup.getLongestQueueItem,
+    getQueueInfo: icwsWorkgroup.getQueueInfo,
 };

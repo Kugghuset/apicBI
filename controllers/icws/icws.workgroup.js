@@ -10,6 +10,12 @@ var icwsSub = require('./icws.sub');
 var icws = require('../../lib/icwsModule');
 
 /**
+ * TODO:
+ * - Handle abandonRate better
+ * - Store all data to Loki.js
+ */
+
+/**
  * The __types to watch changes for.
  *
  * The keys matches function used for processing the data,
@@ -23,6 +29,16 @@ var _typeIds = {
 var __workstations = [];
 var __activeInteractions = [];
 var __finishedInteractions = [];
+
+/**
+ * @type {{ id: String, abandonDate: Date }[]}
+ */
+var __abandonedCalls = [];
+
+/**
+ * @type {{ id: String, completedDate: Date }[]}
+ */
+var __completedCalls = [];
 
 /**
  * The differance in milliseconds in comparison to the server.
@@ -45,9 +61,9 @@ var __timeDiffs = [];
 
 /**
  * The item which has been queueing the longest.
- * @type {{ queueTime: Number, queueLength: Number, id: Number }}
+ * @type {{ queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }}
  */
-var __longestQueueItem = { queueTime: 0, id: null, queueLength: 0 };
+var __queueInfo = { queueTime: 0, id: null, queueLength: 0, abandonedLength: 0, completedLength: 0, abandonRate: 0 };
 
 /**
  * All watcher methods, exactly matching the keys of _typeIds
@@ -89,63 +105,11 @@ function watch(dataArr) {
  * @param {Array} dataArr The array retuerned from polling
  */
 function updateInteractions(data) {
-
     // Get all added interactions
-    var _added = _.map(data.interactionsAdded, function (interaction) {
-        // Return all of the following properties where there is a value.
-        return _.reduce({
-            id: _.get(interaction, 'interactionId'),
-            type: _.get(interaction, 'attributes.Eic_ObjectType'),
-            callType: getCallType(interaction),
-            callDirection: getCallDirection(interaction),
-            remoteAddress: _.get(interaction, 'attributes.Eic_RemoteAddress'),
-            remoteId: _.get(interaction, 'attributes.Eic_RemoteId'),
-            remoteName: _.get(interaction, 'attributes.Eic_RemoteName'),
-            duration: _.get(interaction, 'attributes.Eic_ConnectDurationTime'),
-            state: getState(interaction),
-            stateVal: _.get(interaction, 'attributes.Eic_State'),
-            workgroup: _.get(interaction, 'attributes.Eic_WorkgroupName'),
-            userName: _.get(interaction, 'attributes.Eic_UserName'),
-            startDate: getDate(interaction, 'Eic_InitiationTime'),
-            endDate: getDate(interaction, 'Eic_TerminationTime'),
-            queueDate: getDate(interaction, 'Eic_LineQueueTimestamp'),
-            answerDate: getDate(interaction, 'Eic_AnswerTime'),
-            connectedDate: getDate(interaction, 'Eic_ConnectTime'),
-            referenceDate: new Date(),
-        }, function (obj, value, key) {
-            return !!value
-                ? _.assign({}, obj, _.set({}, key, value))
-                : obj;
-        }, {});
-    });
+    var _added = _.map(data.interactionsAdded, function (interaction) { return _.assign({}, getInteractionData(interaction), { referenceDate: new Date() }) });
 
     // Get all changed interactions
-    var _changed = _.map(data.interactionsChanged, function (interaction) {
-        // Return all of the following properties where there is a value.
-        return _.reduce({
-            id: _.get(interaction, 'interactionId'),
-            type: _.get(interaction, 'attributes.Eic_ObjectType'),
-            callType: getCallType(interaction),
-            callDirection: getCallDirection(interaction),
-            remoteAddress: _.get(interaction, 'attributes.Eic_RemoteAddress'),
-            remoteId: _.get(interaction, 'attributes.Eic_RemoteId'),
-            remoteName: _.get(interaction, 'attributes.Eic_RemoteName'),
-            duration: _.get(interaction, 'attributes.Eic_ConnectDurationTime'),
-            state: getState(interaction),
-            stateVal: _.get(interaction, 'attributes.Eic_State'),
-            workgroup: _.get(interaction, 'attributes.Eic_WorkgroupName'),
-            userName: _.get(interaction, 'attributes.Eic_UserName'),
-            startDate: getDate(interaction, 'Eic_InitiationTime'),
-            endDate: getDate(interaction, 'Eic_TerminationTime'),
-            queueDate: getDate(interaction, 'Eic_LineQueueTimestamp'),
-            answerDate: getDate(interaction, 'Eic_AnswerTime'),
-            connectedDate: getDate(interaction, 'Eic_ConnectTime'),
-        }, function (obj, value, key) {
-            return !!value
-                ? _.assign({}, obj, _.set({}, key, value))
-                : obj;
-        }, {});
-    });
+    var _changed = _.map(data.interactionsChanged, getInteractionData);
 
     // Get all removed interactions
     // NOTE: This is a simple array of ids
@@ -188,6 +152,17 @@ function updateInteractions(data) {
 
                 // Splice in the updated version instead of the original item
                 __activeInteractions.splice(_index, 1, _updated);
+
+                // Add interaction to __abandonedCalls if the call is abandoned and not on the abandoned list
+                if (isAbandoned(_updated) && !_.find(__abandonedCalls, { id: _updated.id })) {
+                    __abandonedCalls.push({ id: _updated.id, abandonDate: new Date() });
+                }
+
+
+                // Add interaction to __completedCalls if the call is completed and not on the completed list
+                if (isCompleted(_updated) && !_.find(__completedCalls, { id: _updated.id })) {
+                    __completedCalls.push({ id: _updated.id, completedDate: new Date() });
+                }
             }
         });
 
@@ -237,12 +212,6 @@ function updateWorkstations(data) {
     // Get all removed workstations
     var _removed = _.map(data.removed, function (workstation) { return _.get(workstation, 'configurationId.id'); });
 
-    /**
-     * TODO: Fill in the gap when there is no end date, but there's a start date and duration.
-     *
-     * TODO: push to some sort of database
-     */
-
     if (_.some([_added, _changed, _removed]), _.some) {
         // Update _workStations
         __workstations = _.chain(__workstations)
@@ -267,6 +236,38 @@ function updateWorkstations(data) {
             queueSub('unsubscribe', _removed);
         }
     }
+}
+
+/**
+ * Returns a more readable interaction object.
+ *
+ * @param {Object} interaction The interaction object returned from ININ
+ * @return {{ id: String, type: String, callType: String, callDirection: String, remoteAddress: String, remoteId: String, remoteName: String, duration: Number, state: String, workgroup: String, userName: String, startDate: Date, endDate: Date, queueDate: Date, answerDate: Date, connectedDate: Date }}
+ */
+function getInteractionData(interaction) {
+    return _.reduce({
+        id: _.get(interaction, 'interactionId'),
+        type: _.get(interaction, 'attributes.Eic_ObjectType'),
+        callType: getCallType(interaction),
+        callDirection: getCallDirection(interaction),
+        remoteAddress: _.get(interaction, 'attributes.Eic_RemoteAddress'),
+        remoteId: _.get(interaction, 'attributes.Eic_RemoteId'),
+        remoteName: _.get(interaction, 'attributes.Eic_RemoteName'),
+        duration: _.get(interaction, 'attributes.Eic_ConnectDurationTime'),
+        state: getState(interaction),
+        stateVal: _.get(interaction, 'attributes.Eic_State'),
+        workgroup: _.get(interaction, 'attributes.Eic_WorkgroupName'),
+        userName: _.get(interaction, 'attributes.Eic_UserName'),
+        startDate: getDate(interaction, 'Eic_InitiationTime'),
+        endDate: getDate(interaction, 'Eic_TerminationTime'),
+        queueDate: getDate(interaction, 'Eic_LineQueueTimestamp'),
+        answerDate: getDate(interaction, 'Eic_AnswerTime'),
+        connectedDate: getDate(interaction, 'Eic_ConnectTime'),
+    }, function (obj, value, key) {
+        return !!value
+            ? _.assign({}, obj, _.set({}, key, value))
+            : obj;
+    }, {});
 }
 
 /**
@@ -425,10 +426,16 @@ function updateCalculatedValues(interaction, index) {
     var _queueTime;
 
     // Update the inQueue property
-    if (inQueue(interaction) && !interaction.inQueue) {
+    if (isInQueue(interaction) && !interaction.inQueue) {
         interaction.inQueue = true;
-    } else if (!inQueue(interaction) && interaction.inQueue) {
+    } else if (!isInQueue(interaction) && interaction.inQueue) {
         interaction.inQueue = false;
+    }
+
+    if (isAbandoned(interaction) && !interaction.abandoned) {
+        interaction.abandoned = true;
+    } else if (!isAbandoned(interaction) && interaction.abandoned) {
+        interaction.abandoned = false;
     }
 
     // Set _queueTime to either the time diff returned form getInteractionQueueTime or the actual queueTime.
@@ -457,7 +464,7 @@ function updateCalculatedValues(interaction, index) {
  * @param {Object} interaction The interaction object to get values from
  * @return {Boolean} Whether the *interaction* is assumed to be in queue or not.
  */
-function inQueue(interaction) {
+function isInQueue(interaction) {
     return !_.some([
         _.isNumber(interaction.queueTime),
         _.isDate(interaction.endDate),
@@ -466,16 +473,46 @@ function inQueue(interaction) {
 }
 
 /**
+ * @param {Object} interaction The interaction object to get values from
+ * @return {Boolean} Whether the *interaction* is assumed to be abandoned or not.
+ */
+function isAbandoned(interaction) {
+    return _.every([
+        _.isDate(interaction.endDate),
+        !_.isDate(interaction.connectedDate),
+        interaction.state === 'Call ended remotely',
+    ]);
+}
+
+/**
+ * @param {Object} interaction The interaction object to get values from
+ * @return {Boolean} Whether the *interaction* is assumed to be completed or not.
+ */
+function isCompleted(interaction) {
+    return _.every([
+        _.isDate(interaction.endDate),
+        _.isDate(interaction.connectedDate),
+        interaction.state !== 'On call',
+    ]);
+}
+
+/**
  * Updates the longest queue time and ID.
  */
 function updateQueueInfo() {
-    __longestQueueItem = _.chain(__activeInteractions)
+    __queueInfo = _.chain(__activeInteractions)
         .filter(function (interaction) { return interaction.inQueue; })
         .map(function (interaction) { return _.assign({}, interaction, { _queueTime: getInteractionQueueTime(interaction) }) })
         .orderBy('_queueTime', 'desc')
         .thru(function (interactions) { return _.map(interactions, function (interaction) { return _.assign({}, interaction, { queueLength: interactions.length }); }); })
         .first()
-        .thru(function (interaction) { return _.isUndefined(interaction) ? { id: null, queueTime: 0, queueLength: 0 } : { id: interaction.id, queueTime: interaction._queueTime, queueLength: interaction.queueLength } })
+        .thru(function (interaction) {
+            return _.isUndefined(interaction)
+            ? { id: null, queueTime: 0, queueLength: 0 }
+            : { id: interaction.id, queueTime: interaction._queueTime, queueLength: interaction.queueLength }
+        })
+        .thru(function (queueInfo) { return _.assign({}, queueInfo, { abandonedLength: __abandonedCalls.length, completedLength: __completedCalls.length }) })
+        .thru(function (queueInfo) { return _.assign({}, queueInfo, { abandonRate: (((queueInfo.abandonedLength / queueInfo.completedLength) || 0) * 100).toFixed(2) }) })
         .value();
 }
 
@@ -630,7 +667,7 @@ module.exports = {
             finishedInteractions: __finishedInteractions,
         }
     },
-    getLongestQueueItem: function () {
-        return __longestQueueItem;
+    getQueueInfo: function () {
+        return __queueInfo;
     },
 }
