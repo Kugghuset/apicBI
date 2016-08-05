@@ -13,6 +13,7 @@ var icws = require('../../lib/icwsModule');
  * TODO:
  * - Handle abandonRate better
  * - Store all data to Loki.js
+ * - Clear data every day/week
  */
 
 /**
