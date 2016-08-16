@@ -10,6 +10,7 @@ var _interval;
 
 var icwsUser = require('./icws/icws.user');
 var icwsWorkgroup = require('./icws/icws.workgroup');
+var icwsStorage = require('./icws/icws.storage');
 
 // All users in the system
 var _users = [];

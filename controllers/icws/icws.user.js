@@ -4,6 +4,9 @@ var _ = require('lodash');
 var Promise = require('bluebird');
 
 var icwsSub = require('./icws.sub');
+var icwsStorage = require('./icws.storage');
+
+var _agents = icwsStorage.getCollection('agents');
 
 /**
  * The __types to watch changes for.

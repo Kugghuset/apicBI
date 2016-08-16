@@ -18,6 +18,14 @@ app.use(express.static(root + '/www'));
 
 var router = new express.Router();
 
+router.get('/resources', function (req, res) {
+  var users = icwsCtrl.getUsers();
+  var interactions = icwsCtrl.getInteractions();
+  var queueInfo = icwsCtrl.getQueueInfo();
+
+  res.status(200).json({ users: users, interactions: interactions, queueInfo: queueInfo });
+})
+
 router.get('/users', function (req, res) {
   var users = icwsCtrl.getUsers();
 

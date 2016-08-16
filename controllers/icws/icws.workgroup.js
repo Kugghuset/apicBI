@@ -8,12 +8,17 @@ var moment = require('moment');
 
 var icwsSub = require('./icws.sub');
 var icws = require('../../lib/icwsModule');
+var icwsStorage = require('./icws.storage');
+
+var Interactions = icwsStorage.getCollection('interactions');
+var WorkStations = icwsStorage.getCollection('workstations');
 
 /**
  * TODO:
  * - Handle abandonRate better
  * - Store all data to Loki.js
  * - Clear data every day/week
+ * - Smooth out queue time diff
  */
 
 /**
@@ -121,18 +126,32 @@ function updateInteractions(data) {
         // Add them all
         __activeInteractions = __activeInteractions.concat(_.map(_added, function (interaction) {
             // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
-            if (_.isUndefined(interaction.queueTime) && !_.some([interaction.queueDate, interaction.connectedDate], _.isUndefined)) {
+            if (hasQueueTime(interaction)) {
                 interaction.queueTime = getDateDiff(interaction.queueDate, interaction.connectedDate, 'seconds');
             }
 
             return interaction;
         }));
 
-        console.log('\nAdded interactions:');
-        console.log(JSON.stringify(_added, null, 4));
+        /**
+         * Push or update persisted data.
+         */
+        _.forEach(_added, function (interaction) {
+            if (hasQueueTime(interaction)) {
+                interaction.queueTime = getDateDiff(interaction.queueDate, interaction.connectedDate, 'seconds');
+            }
 
-        var _interactionPath = path.resolve(__dirname, '../../assets/icws/addedInteractions{date}.json'.replace('{date}', moment().format('HHmmss')));
-        // fs.writeFileSync(_interactionPath, JSON.stringify(_activeInteractions, null, 4), 'utf8');
+            var _updated = Interactions.findOne({ id: interaction.id });
+
+            if (_.isNull(_updated)) {
+                // Insert the interaction as it's a legitimately new one
+                Interactions.insert(interaction);
+            } else {
+                // Update the interaction
+                _updated = _.assign(_updated, interaction);
+                Interactions.update(_updated);
+            }
+        });
     }
 
     // Handle changes
@@ -147,7 +166,7 @@ function updateInteractions(data) {
                 var _updated = _.assign({}, _interaction, interaction);
 
                 // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
-                if (_.isUndefined(_updated.queueTime) && !_.some([_updated.queueDate, _updated.connectedDate], _.isUndefined)) {
+                if (hasQueueTime(_updated)) {
                     _updated.queueTime = getDateDiff(_updated.queueDate, _updated.connectedDate, 'seconds');
                 }
 
@@ -159,7 +178,6 @@ function updateInteractions(data) {
                     __abandonedCalls.push({ id: _updated.id, abandonDate: new Date() });
                 }
 
-
                 // Add interaction to __completedCalls if the call is completed and not on the completed list
                 if (isCompleted(_updated) && !_.find(__completedCalls, { id: _updated.id })) {
                     __completedCalls.push({ id: _updated.id, completedDate: new Date() });
@@ -167,22 +185,55 @@ function updateInteractions(data) {
             }
         });
 
-        console.log('\nChanged interactions');
-        console.log(JSON.stringify(_changed, null, 4));
+        /**
+         * Update persisted data.
+         */
+        _.forEach(_changed, function (interaction) {
+            var _updated = Interactions.findOne({ id: interaction.id });
 
-        var _interactionPath = path.resolve(__dirname, '../../assets/icws/interactions{date}.json'.replace('{date}', moment().format('HHmmss')));
-        // fs.writeFileSync(_interactionPath, JSON.stringify(_activeInteractions, null, 4), 'utf8');
+            if (_.isNull(_updated)) {
+                console.log('Failed to find interaction: ' + interaction.id);
+                return;
+            }
+
+            // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
+            if (hasQueueTime(_updated)) {
+                _updated.queueTime = getDateDiff(_updated.queueDate, _updated.connectedDate, 'seconds');
+            }
+
+            if (isAbandoned(_updated) && !_updated.isAbandoned) {
+                // Set isAbandoned and abandonDate
+                _updated.isAbandoned = true;
+                _updated.abandonDate = new Date();
+            } else if (isCompleted(_updated) && !_updated.isAbandoned) {
+                // Set isCompleted and completedDate
+                _updated.isCompleted = true;
+                _updated.completedDate = new Date();
+            }
+
+            // Update the interaction
+            _updated = _.assign(_updated, interaction);
+            Interactions.update(_updated);
+        });
     }
 
     // Handle removed interactions
     if (_.some(_removed)) {
         var _removedItems = _.remove(__activeInteractions, function (interaction) { return !!~_removed.indexOf(interaction.id); });
         __finishedInteractions.concat(_removedItems);
-        console.log('\nRemoved interactions:');
-        console.log(JSON.stringify(_removedItems, null, 4));
 
-        var _finishedInteractionsPath = path.resolve(__dirname, '../../assets/icws/removedInteractions{date}.json'.replace('{date}', moment().format('HHmmss')));
-        // fs.writeFileSync(_finishedInteractionsPath, JSON.stringify(_removedItems, null, 4), 'utf8');
+        _.forEach(_removed, function (removedId) {
+            var _updated = Interactions.findOne({ id: removedId });
+
+            if (_.isNull(_updated)) {
+                console.log('Failed to remove interaction, could not find it: ' + removedId);
+                return;
+            }
+
+            // Update the interaction
+            _updated.isCurrent = false;
+            Interactions.update(_updated);
+        });
     }
 }
 
@@ -264,6 +315,7 @@ function getInteractionData(interaction) {
         queueDate: getDate(interaction, 'Eic_LineQueueTimestamp'),
         answerDate: getDate(interaction, 'Eic_AnswerTime'),
         connectedDate: getDate(interaction, 'Eic_ConnectTime'),
+        isCurrent: true,
     }, function (obj, value, key) {
         return !!value
             ? _.assign({}, obj, _.set({}, key, value))
@@ -475,7 +527,15 @@ function isInQueue(interaction) {
 
 /**
  * @param {Object} interaction The interaction object to get values from
- * @return {Boolean} Whether the *interaction* is assumed to be abandoned or not.
+ * @return {Boolean} Whether the *interaction* has queueTime or not.
+ */
+function hasQueueTime(interaction) {
+    return  _.isUndefined(interaction.queueTime) && !_.some([interaction.queueDate, interaction.connectedDate], _.isUndefined);
+}
+
+/**
+ * @param {Object} interaction The interaction object to get values from
+ * @return {Boolean} Whether the *interaction* is assumed to be completed or not.
  */
 function isAbandoned(interaction) {
     return _.every([

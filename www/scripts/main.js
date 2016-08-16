@@ -58,46 +58,29 @@ var app = new Vue({
   },
   ready() {
     setInterval(function () {
-      /**
-       * Get users.
-       */
-      this.$http.get('/users')
+      this.$http.get('/resources')
       .then(
         function (response) {
+
           this.users = response
             .data
+            .users
             .map(function (user) { return user; })
             .filter(function (user) { return user.loggedIn })
-        }, function (err) {
-          console.log(err);
-        });
 
-        /**
-         * Get interactions
-         */
-        this.$http.get('/interactions')
-        .then(
-          function (response) {
-            this.interactions = (response.data.activeInteractions || [])
+          this.interactions = ((response.data.interactions || {}).activeInteractions || [])
               .map(function (interaction) {
                 var user = (this.users.filter(function (usr) { return usr.id === interaction.userName; }) || [])[0];
 
                 return Object.assign({}, interaction, { user: user })
               }.bind(this));
-          }, function (err) {
-            console.log(err);
-          });
 
-        this.$http.get('/queue-info')
-        .then(
-          function (response) {
-            this.queueInfo = response.data;
+          this.queueInfo = response.data.queueInfo;
 
-            console.log(JSON.parse(JSON.stringify(this.queueInfo)))
-
-          }, function (err) {
-            console.log(err)
-          });
+        }, function (err) {
+          console.log(err);
+        }
+      );
 
       this.currentTime = moment().diff(moment().startOf('day'), 'seconds');
 
