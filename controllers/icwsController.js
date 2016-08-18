@@ -149,6 +149,7 @@ function run() {
     return new Promise(function (resolve, reject) {
 
         init()
+        // .then(icwsStorage.init)
         .then(function () {
 
           return icws.put('messaging/subscriptions/statistics/statistic-values', {

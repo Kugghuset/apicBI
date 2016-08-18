@@ -5,13 +5,21 @@ var Promise = require('bluebird');
 var fs = require('fs');
 var path = require('path');
 var moment = require('moment');
+var loki = require('lokijs');
 
 var icwsSub = require('./icws.sub');
 var icws = require('../../lib/icwsModule');
 var icwsStorage = require('./icws.storage');
 
-var Interactions = icwsStorage.getCollection('interactions');
-var WorkStations = icwsStorage.getCollection('workstations');
+/**
+ * @type {LokiCollection<{}>}
+ */
+var Interactions = icwsStorage.getCollection('interactions');;
+
+/**
+ * @type {LokiCollection<{}>}
+ */
+var WorkStations = icwsStorage.getCollection('workstations');;
 
 /**
  * TODO:
@@ -141,13 +149,19 @@ function updateInteractions(data) {
                 interaction.queueTime = getDateDiff(interaction.queueDate, interaction.connectedDate, 'seconds');
             }
 
-            var _updated = Interactions.findOne({ id: interaction.id });
+            var _updated = Interactions.findOne({ id: _.toString(interaction.id) });
 
             if (_.isNull(_updated)) {
                 // Insert the interaction as it's a legitimately new one
+                console.log('\n');
+                console.log('Inserting new interaction')
+                console.log('\n');
                 Interactions.insert(interaction);
             } else {
                 // Update the interaction
+                console.log('\n');
+                console.log('Updating existing interaction')
+                console.log('\n');
                 _updated = _.assign(_updated, interaction);
                 Interactions.update(_updated);
             }
@@ -189,7 +203,7 @@ function updateInteractions(data) {
          * Update persisted data.
          */
         _.forEach(_changed, function (interaction) {
-            var _updated = Interactions.findOne({ id: interaction.id });
+            var _updated = Interactions.findOne({ id: _.toString(interaction.id) });
 
             if (_.isNull(_updated)) {
                 console.log('Failed to find interaction: ' + interaction.id);
@@ -223,7 +237,7 @@ function updateInteractions(data) {
         __finishedInteractions.concat(_removedItems);
 
         _.forEach(_removed, function (removedId) {
-            var _updated = Interactions.findOne({ id: removedId });
+            var _updated = Interactions.findOne({ id: _.toString(removedId) });
 
             if (_.isNull(_updated)) {
                 console.log('Failed to remove interaction, could not find it: ' + removedId);
@@ -511,6 +525,13 @@ function updateCalculatedValues(interaction, index) {
 
     // Replace the item in the list.
     __activeInteractions.splice(index, 1, _updated);
+
+    var _interaction = Interactions.find({ id: _.toString(interaction.id) });
+
+    if (_interaction) {
+        _interaction = _.assign(_interaction, _updated);
+        Interactions.update(_interaction);
+    }
 }
 
 /**
@@ -519,8 +540,8 @@ function updateCalculatedValues(interaction, index) {
  */
 function isInQueue(interaction) {
     return !_.some([
-        _.isNumber(interaction.queueTime),
-        _.isDate(interaction.endDate),
+        !_.isUndefined(interaction.queueTime),
+        !!interaction.endDate,
         interaction.callDirection !== 'inbound'
     ]);
 }
@@ -539,8 +560,8 @@ function hasQueueTime(interaction) {
  */
 function isAbandoned(interaction) {
     return _.every([
-        _.isDate(interaction.endDate),
-        !_.isDate(interaction.connectedDate),
+        !!interaction.endDate,
+        !interaction.connectedDate,
         interaction.state === 'Call ended remotely',
     ]);
 }
@@ -551,8 +572,8 @@ function isAbandoned(interaction) {
  */
 function isCompleted(interaction) {
     return _.every([
-        _.isDate(interaction.endDate),
-        _.isDate(interaction.connectedDate),
+        !!interaction.endDate,
+        !!interaction.connectedDate,
         interaction.state !== 'On call',
     ]);
 }
@@ -572,9 +593,24 @@ function updateQueueInfo() {
             ? { id: null, queueTime: 0, queueLength: 0 }
             : { id: interaction.id, queueTime: interaction._queueTime, queueLength: interaction.queueLength }
         })
-        .thru(function (queueInfo) { return _.assign({}, queueInfo, { abandonedLength: __abandonedCalls.length, completedLength: __completedCalls.length }) })
-        .thru(function (queueInfo) { return _.assign({}, queueInfo, { abandonRate: (((queueInfo.abandonedLength / queueInfo.completedLength) || 0) * 100).toFixed(2) }) })
+        .thru(function (queueInfo) { return _.assign({}, queueInfo, getDailyQueueData()); })
         .value();
+}
+
+/**
+ * @return {{ abandonDate: Number, abandonedLength: Number, completedDate: Number }}
+ */
+function getDailyQueueData() {
+    var _startdate = { $gte: moment().startOf('day').toDate(), $lte: moment().endOf('day').toDate(), };
+
+    var _abandoned = Interactions.find({ isAbandoned: true, startDate: _startdate });
+    var _completed = Interactions.find({ isCompleted: true, startDate: _startdate });
+
+    return {
+        abandonRate: (((_abandoned.length / _completed.length) || 0) * 100).toFixed(2),
+        abandonedLength: _abandoned.length,
+        completedLength: _completed.length,
+    }
 }
 
 /**
@@ -705,6 +741,27 @@ function queueSub(action, subId, workstations) {
 }
 
 /**
+ * Sets up the stored data.
+ */
+function setupStorage() {
+    Interactions = icwsStorage.getCollection('interactions');
+    WorkStations = icwsStorage.getCollection('workstations');
+
+    // Update all values
+    Interactions.findAndUpdate(function () { return true; }, function (obj) {
+        if (isAbandoned(obj)) {
+            obj.isAbandoned = true;
+        } else if (isCompleted(obj)) {
+            obj.isCompleted = true;
+        } else if (isInQueue(obj)) {
+            obj.inQueue = true;
+        }
+
+        return _.assign(obj, { isCurrent: false, inQueue: false });
+    });
+}
+
+/**
  * Sets the workgroup subscriptions up.
  *
  * @param {String} subId Subscription ID string, defaults ot 'kugghuset-1'
@@ -716,6 +773,8 @@ function setup(subId) {
         ? subId
         : 'kugghuset-1';
 
+    setupStorage();
+
     return workStationSub('subscribe', subId);
 }
 
@@ -725,6 +784,7 @@ module.exports = {
     getInteractions: function () {
         return {
             activeInteractions: __activeInteractions,
+            _activeInteractions: Interactions.find({ isCurrent: true }),
             finishedInteractions: __finishedInteractions,
         }
     },

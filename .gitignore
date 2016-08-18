@@ -48,3 +48,4 @@ icws_auth.*
 **/typings
 tsd.json
 assets/icws
+assets/icws-storage.json

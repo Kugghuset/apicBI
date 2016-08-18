@@ -12,7 +12,24 @@ var utils = require('./../../lib/utils');
 var _dbPath = path.resolve(__dirname, '../../assets/icws-storage.json');
 var _isLoaded = false;
 
-var _storage = new loki(_dbPath, { autosave: true, autosaveInterval: 1000 });
+// If there is no database file, create it
+if (!fs.existsSync(_dbPath)) {
+  console.log('Creating local storage for icws in memory database.');
+  fs.writeFileSync(_dbPath, '');
+}
+
+var _storage = new loki(_dbPath, { autosave: true, autosaveInterval: 100, autoloadCallback: onLoaded, autoload: true });
+
+function onLoaded(err) {
+  if (err) {
+    console.log(err);
+  } else {
+    console.log('Database loaded');
+    _isLoaded = true;
+
+    var Interactions = _storage.getCollection('interactions');
+  }
+}
 
 /**
  * Returns the storage instance.
@@ -25,14 +42,16 @@ function init() {
   return new Promise(function (resolve, reject) {
     // Check if it's loaded already
     if (_isLoaded) {
+      console.log('Database is already loaded')
       return resolve(_storage);
     }
 
     // If there is no database file, create it
     if (!fs.existsSync(_dbPath)) {
-      console.log('Creating local storage for icws in moemory database.');
+      console.log('Creating local storage for icws in memory database.');
       fs.writeFileSync(_dbPath, '');
     }
+
 
     // Load the db from disk.
     _storage.loadDatabase({}, function (err) {
