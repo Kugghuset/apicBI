@@ -18,7 +18,7 @@ app.use(express.static(root + '/www'));
 
 var router = new express.Router();
 
-router.get('/resources', function (req, res) {
+router.get('/api/resources', function (req, res) {
   var users = icwsCtrl.getUsers();
   var interactions = icwsCtrl.getInteractions();
   var queueInfo = icwsCtrl.getQueueInfo();
@@ -26,19 +26,19 @@ router.get('/resources', function (req, res) {
   res.status(200).json({ users: users, interactions: interactions, queueInfo: queueInfo });
 })
 
-router.get('/users', function (req, res) {
+router.get('/api/users', function (req, res) {
   var users = icwsCtrl.getUsers();
 
   res.status(200).json(users);
 });
 
-router.get('/interactions', function (req, res) {
+router.get('/api/interactions', function (req, res) {
   var interactions = icwsCtrl.getInteractions();
 
   res.status(200).json(interactions);
 });
 
-router.get('/queue-info', function (req, res) {
+router.get('/api/queue-info', function (req, res) {
   var queueInfo = icwsCtrl.getQueueInfo();
 
   res.status(200).json(queueInfo);

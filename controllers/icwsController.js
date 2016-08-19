@@ -3,20 +3,12 @@
 var _ = require('lodash');
 var Promise = require('bluebird');
 
-var ICWS = require('../lib/icws');
-
 var icws = require('../lib/icwsModule');
 var _interval;
 
 var icwsUser = require('./icws/icws.user');
 var icwsWorkgroup = require('./icws/icws.workgroup');
 var icwsStorage = require('./icws/icws.storage');
-
-// All users in the system
-var _users = [];
-
-// Users grouped by their state
-var _usersByState = {};
 
 /**
  * Polls the messaging route for new data
@@ -25,7 +17,6 @@ var _usersByState = {};
  * @return void
  */
 function poll() {
-
     icws.get('messaging/messages')
     .then(function (res) {
 
@@ -36,28 +27,10 @@ function poll() {
         // Watch for, and handles changes regarding users
         icwsUser.watch(dataArr);
         icwsWorkgroup.watch(dataArr);
-    });
-}
-
-/**
- * Creates a subscription to *path* with *content*.
- *
- * @param {String} path
- * @param {Object} body
- * @return {Promise}
- */
-function subscribe(path, body) {
-    return icws.put(path, body);
-}
-
-/**
- * Deletes a subscriptoin to *path*
- *
- * @param {String} path
- * @return {Promise}
- */
-function unsubscribe(path) {
-    return icws.delete(path);
+    })
+    .catch(function (err) {
+        console.log('The following error occured when polling: ' + err.toString());
+    })
 }
 
 /***************
@@ -65,15 +38,6 @@ function unsubscribe(path) {
  * Exported functions.
  *
  **************/
-
-/**
- * Returns a promise of an initialized (authenticated) icws object.
- *
- * @return {Promise} -> {Object}
- */
-function init() {
-    return icws.auth();
-}
 
 /**
  * Sets up the subscriptions to all items of intereset.
@@ -148,8 +112,7 @@ function stopPolling() {
 function run() {
     return new Promise(function (resolve, reject) {
 
-        init()
-        // .then(icwsStorage.init)
+        icws.auth()
         .then(function () {
 
           return icws.put('messaging/subscriptions/statistics/statistic-values', {
@@ -199,9 +162,6 @@ function run() {
 }
 
 module.exports = {
-    init: init,
-    setupSubscriptions: setupSubscriptions,
-    startPolling: startPolling,
     stopPolling: stopPolling,
     run: run,
     getUsers: icwsUser.getUsers,

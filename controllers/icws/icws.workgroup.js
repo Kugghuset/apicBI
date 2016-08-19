@@ -492,6 +492,9 @@ function updateCalculatedValues(interaction, index) {
     // Create a variable for _queueTime to be used.
     var _queueTime;
 
+    // Get the persisted interaction
+    var _storedInteraction = Interactions.findOne({ id: _.toString(interaction.id) });
+
     // Update the inQueue property
     if (isInQueue(interaction) && !interaction.inQueue) {
         interaction.inQueue = true;
@@ -517,7 +520,9 @@ function updateCalculatedValues(interaction, index) {
 
     // If __queueTime (calculated queueTime) is undefined and the *interaction* is not in queue, set __queueTime.
     if (_.isUndefined(_updated.__queueTime) && !interaction.inQueue) {
-        interaction.__queueTime = getInteractionQueueTime(interaction);
+        interaction.__queueTime = !!_.get(_storedInteraction, '__queueTime')
+            ? _.get(_storedInteraction, '__queueTime')
+            : getInteractionQueueTime(interaction);
 
         // Push the diff to __timeDiffs to store it.
         __timeDiffs.push(interaction.__queueTime - interaction._queueTime);
@@ -526,12 +531,20 @@ function updateCalculatedValues(interaction, index) {
     // Replace the item in the list.
     __activeInteractions.splice(index, 1, _updated);
 
-    var _interaction = Interactions.find({ id: _.toString(interaction.id) });
-
-    if (_interaction) {
-        _interaction = _.assign(_interaction, _updated);
-        Interactions.update(_interaction);
+    if (_storedInteraction) {
+        _storedInteraction = _.assign(_storedInteraction, _updated);
+        Interactions.update(_storedInteraction);
     }
+}
+
+/**
+ * Returns a boolean value of whether the *_date* can be a date or not.
+ *
+ * @param {Any} _date
+ * @return {Boolean}
+ */
+function isParsableOrDate(_date) {
+    return !_date ? false : moment(new Date(_date)).isValid();
 }
 
 /**
@@ -541,7 +554,7 @@ function updateCalculatedValues(interaction, index) {
 function isInQueue(interaction) {
     return !_.some([
         !_.isUndefined(interaction.queueTime),
-        !!interaction.endDate,
+        isParsableOrDate(interaction.endDate),
         interaction.callDirection !== 'inbound'
     ]);
 }
@@ -560,8 +573,8 @@ function hasQueueTime(interaction) {
  */
 function isAbandoned(interaction) {
     return _.every([
-        !!interaction.endDate,
-        !interaction.connectedDate,
+        isParsableOrDate(interaction.endDate),
+        !isParsableOrDate(interaction.connectedDate),
         interaction.state === 'Call ended remotely',
     ]);
 }
@@ -572,8 +585,8 @@ function isAbandoned(interaction) {
  */
 function isCompleted(interaction) {
     return _.every([
-        !!interaction.endDate,
-        !!interaction.connectedDate,
+        isParsableOrDate(interaction.endDate),
+        isParsableOrDate(interaction.connectedDate),
         interaction.state !== 'On call',
     ]);
 }
