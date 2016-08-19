@@ -18,41 +18,41 @@
 
     <table>
       <thead>
-        <th>ID</th>
+        <!--<th>ID</th>-->
         <th>User name</th>
         <th>Remote number</th>
         <th>Workgroup</th>
         <th>State</th>
         <th>Call type</th>
         <th>Start date</th>
-        <th>Reference date</th>
+        <!--<th>Reference date</th>-->
         <th>End date</th>
         <th>Duration (seconds)</th>
         <th>Date queued</th>
         <th>Date connected</th>
         <th>Time queued</th>
         <th>Calc. time queued</th>
-        <th>Is abandoned</th>
-        <th>Is completed</th>
+        <!--<th>Is abandoned</th>-->
+        <!--<th>Is completed</th>-->
       </thead>
       <tbody>
-        <tr v-for="interaction in interactions | orderBy 'queueDate'">
-          <td>{{ interaction.id }}</td>
+        <tr v-for="interaction in interactions | orderBy 'queueDate'" :class="{ 'available': interaction.isCompleted }">
+          <!--<td>{{ interaction.id }}</td>-->
           <td>{{ interaction.user.name || interaction.userName }}</td>
           <td>{{ interaction.remoteAddress }}</td>
           <td>{{ interaction.workgroup }}</td>
           <td>{{ interaction.state }}</td>
           <td>{{ interaction.callType + ' (' + (interaction.callDirection || 'missing') + ')' }}</td>
           <td>{{ interaction.startDate | date 'HH:mm:ss' }}</td>
-          <td>{{ interaction.referenceDate | date 'HH:mm:ss' }}</td>
+          <!--<td>{{ interaction.referenceDate | date 'HH:mm:ss' }}</td>-->
           <td>{{ interaction.endDate | date 'HH:mm:ss' }}</td>
           <td>{{ interaction.duration > 0 ? formatTimer(interaction.duration) : 'pending' }}</td>
           <td>{{ interaction.queueDate | date 'YYYY-MM-DD HH:mm:ss' }}</td>
           <td>{{ interaction.connectedDate | date 'YYYY-MM-DD HH:mm:ss' }}</td>
           <td>{{ interaction.queueTime > 0 ? formatTimer(interaction.queueTime) : (!!interaction.endDate ? 'abandoned call' : 'in queue') }}</td>
           <td>{{ interaction.__queueTime > 0 ? formatTimer(interaction.__queueTime) : formatTimer(interaction._queueTime) }}</td>
-          <td>{{ !!interaction.isAbandoned ? interaction.isAbandoned : false }}</td>
-          <td>{{ !!interaction.isCompleted ? interaction.isCompleted : false }}</td>
+          <!--<td>{{ !!interaction.isAbandoned ? interaction.isAbandoned : false }}</td>-->
+          <!--<td>{{ !!interaction.isCompleted ? interaction.isCompleted : false }}</td>-->
         </tr>
       </tbody>
     </table>

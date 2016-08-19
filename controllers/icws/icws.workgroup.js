@@ -12,6 +12,10 @@ var icws = require('../../lib/icwsModule');
 var icwsStorage = require('./icws.storage');
 
 /**
+ * TODO: Ensure isCompleted and isAbandoned properly is stored.
+ */
+
+/**
  * @type {LokiCollection<{}>}
  */
 var Interactions = icwsStorage.getCollection('interactions');;
@@ -23,8 +27,6 @@ var WorkStations = icwsStorage.getCollection('workstations');;
 
 /**
  * TODO:
- * - Handle abandonRate better
- * - Store all data to Loki.js
  * - Clear data every day/week
  * - Smooth out queue time diff
  */
@@ -74,7 +76,8 @@ var __localTimeDiff = null;
 var __timeDiffs = [];
 
 /**
- * The item which has been queueing the longest.
+ * Object containing information about the queues.
+ *
  * @type { csa: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }, partnerService: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number } }
  */
 var __queueInfo = {
@@ -156,15 +159,9 @@ function updateInteractions(data) {
 
             if (_.isNull(_updated)) {
                 // Insert the interaction as it's a legitimately new one
-                console.log('\n');
-                console.log('Inserting new interaction')
-                console.log('\n');
                 Interactions.insert(interaction);
             } else {
                 // Update the interaction
-                console.log('\n');
-                console.log('Updating existing interaction')
-                console.log('\n');
                 _updated = _.assign(_updated, interaction);
                 Interactions.update(_updated);
             }
@@ -804,16 +801,13 @@ function setupStorage() {
     WorkStations = icwsStorage.getCollection('workstations');
 
     // Update all values
-    Interactions.findAndUpdate(function () { return true; }, function (obj) {
-        if (isAbandoned(obj)) {
-            obj.isAbandoned = true;
-        } else if (isCompleted(obj)) {
-            obj.isCompleted = true;
-        } else if (isInQueue(obj)) {
-            obj.inQueue = true;
-        }
-
-        return _.assign(obj, { isCurrent: false, inQueue: false });
+    Interactions.findAndUpdate(function () { return true; }, function (item) {
+        return _.assign(item, {
+            isCurrent: false,
+            inQueue: isInQueue(item),
+            isAbandoned: isAbandoned(item),
+            isCompleted: isCompleted(item)
+        });
     });
 }
 

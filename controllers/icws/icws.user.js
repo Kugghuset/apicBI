@@ -6,7 +6,7 @@ var Promise = require('bluebird');
 var icwsSub = require('./icws.sub');
 var icwsStorage = require('./icws.storage');
 
-var _agents = icwsStorage.getCollection('agents');
+var Agents = icwsStorage.getCollection('agents');
 
 /**
  * The __types to watch changes for.
@@ -82,7 +82,7 @@ function updateUsers(data) {
             statusName: _.get(user, 'statusText'),
             lastLocalChange: new Date(),
             workgroups: _.map(_.get(user, 'workgroups'), function (wg) { return { id: wg.id, name: wg.displayName } }),
-        }
+        };
     });
 
     // Check if there are any changes in any of the arrays
@@ -203,6 +203,17 @@ function userStatusSub(action, users) {
 }
 
 /**
+ * Sets up the stored agents.
+ */
+function setupStorage() {
+    Agents = icwsStorage.getCollection('agents');
+
+    Agents.findAndUpdate(function () { return true; }, function (agent) {
+        return _.assign(item, { isCurrent: false, });
+    });
+}
+
+/**
  * Sets the user subscriptions up.
  *
  * @param {String} subId Subscription ID string, defaults to 'kugghuset-1'
@@ -213,6 +224,8 @@ function setup(subId) {
     subId = !_.isUndefined(subId)
         ? subId
         : 'kugghuset-1';
+
+    setupStorage();
 
     return userListSub('subscribe', subId);
 }
