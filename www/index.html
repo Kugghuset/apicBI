@@ -33,6 +33,7 @@
         <th>Time queued</th>
         <th>Calc. time queued</th>
         <th>Is abandoned</th>
+        <th>Is completed</th>
       </thead>
       <tbody>
         <tr v-for="interaction in interactions | orderBy 'queueDate'">
@@ -50,18 +51,45 @@
           <td>{{ interaction.connectedDate | date 'YYYY-MM-DD HH:mm:ss' }}</td>
           <td>{{ interaction.queueTime > 0 ? formatTimer(interaction.queueTime) : (!!interaction.endDate ? 'abandoned call' : 'in queue') }}</td>
           <td>{{ interaction.__queueTime > 0 ? formatTimer(interaction.__queueTime) : formatTimer(interaction._queueTime) }}</td>
-          <td>{{ !!interaction.abandoned ? interaction.abandoned : false }}</td>
+          <td>{{ !!interaction.isAbandoned ? interaction.isAbandoned : false }}</td>
+          <td>{{ !!interaction.isCompleted ? interaction.isCompleted : false }}</td>
         </tr>
       </tbody>
     </table>
 
-    <h1>Current queue time is {{ formatTimer(queueInfo.queueTime) }} ({{ queueInfo.queueLength }} calls in queue)</h1>
+    <h1>Daily queue info</h1>
 
-    <h1>Number of abandoned calls: {{ queueInfo.abandonedLength }}</h1>
-    <h1>Number of completed calls: {{ queueInfo.completedLength }}</h1>
+    <table>
+      <thead>
+        <th>Workgroup</th>
+        <th>Queue length</th>
+        <th>Queue time</th>
+        <th>Completed calls</th>
+        <th>Abandoned calls</th>
+        <th>Abandon rate</th>
+      </thead>
+      <tbody>
+        <tr v-for="workgroup in ['csa', 'partnerService']">
+          <td>{{ workgroup === 'csa' ? 'CSA' : 'Partner Service' }}</td>
+          <td>{{ queueInfo[workgroup].queueLength }}</td>
+          <td>{{ formatTimer(queueInfo[workgroup].queueTime) }}</td>
+          <td>{{ queueInfo[workgroup].completedLength }}</td>
+          <td>{{ queueInfo[workgroup].abandonedLength }}</td>
+          <td>{{ queueInfo[workgroup].abandonRate + ' %' }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+<!--
+    <h1>Current queue time is {{ formatTimer(queueInfo.queueTime) }} ({{ queueInfo.queueLength }} calls in queue)</h1>
+    <h1>CSA queue time is {{ formatTimer(queueInfo.csa.queueTime) }} ({{ queueInfo.csa.queueLength }} calls in queue)</h1>
+    <h1>Partner Service queue time is {{ formatTimer(queueInfo.partnerService.queueTime) }} ({{ queueInfo.partnerService.queueLength }} calls in queue)</h1>
+
+    <h1>Number of abandoned calls, CSA: {{ queueInfo.csa.abandonedLength }}, Partner Service: {{ queueInfo.partnerService.abandonedLength }}</h1>
+    <h1>Number of completed calls, CSA: {{ queueInfo.csa.completedLength }}, Partner Service: {{ queueInfo.partnerService.completedLength }}</h1>
     <h1>Abandon rate is {{ queueInfo.abandonRate }} %</h1>
 
-    <h1>Current time: {{ formatTimer(currentTime) }}</h1>
+    <h1>Current time: {{ formatTimer(currentTime) }}</h1>-->
 
     <h1>{{ _availableUsers.length }} available agents</h1>
 

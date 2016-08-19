@@ -75,9 +75,12 @@ var __timeDiffs = [];
 
 /**
  * The item which has been queueing the longest.
- * @type {{ queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }}
+ * @type { csa: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }, partnerService: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number } }
  */
-var __queueInfo = { queueTime: 0, id: null, queueLength: 0, abandonedLength: 0, completedLength: 0, abandonRate: 0 };
+var __queueInfo = {
+    csa: { queueTime: 0, id: null, queueLength: 0, abandonedLength: 0, completedLength: 0, abandonRate: 0 },
+    partnerService: { queueTime: 0, id: null, queueLength: 0, abandonedLength: 0, completedLength: 0, abandonRate: 0 },
+};
 
 /**
  * All watcher methods, exactly matching the keys of _typeIds
@@ -502,10 +505,10 @@ function updateCalculatedValues(interaction, index) {
         interaction.inQueue = false;
     }
 
-    if (isAbandoned(interaction) && !interaction.abandoned) {
-        interaction.abandoned = true;
-    } else if (!isAbandoned(interaction) && interaction.abandoned) {
-        interaction.abandoned = false;
+    if (isAbandoned(interaction) && !interaction.isAbandoned) {
+        interaction.isAbandoned = true;
+    } else if (!isAbandoned(interaction) && interaction.isAbandoned) {
+        interaction.isAbandoned = false;
     }
 
     // Set _queueTime to either the time diff returned form getInteractionQueueTime or the actual queueTime.
@@ -592,11 +595,28 @@ function isCompleted(interaction) {
 }
 
 /**
- * Updates the longest queue time and ID.
+ * @param {{ startDate: Date }} item
+ * @return {Boolean}
  */
-function updateQueueInfo() {
-    __queueInfo = _.chain(__activeInteractions)
-        .filter(function (interaction) { return interaction.inQueue; })
+function isToday(item) {
+    return !item
+        ? false
+        : moment(item.startDate).isBetween(
+            moment().startOf('day'),
+            moment().endOf('day')
+        );
+}
+
+/**
+ * @param {String} workgroupName
+ * @return {{ queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number })
+ */
+function getQueueInfoData(workgroupName) {
+    return _.chain(Interactions.where(function (item) { return _.every([
+        item.isCurrent,
+        item.workgroup === workgroupName,
+        item.inQueue,
+    ])}))
         .map(function (interaction) { return _.assign({}, interaction, { _queueTime: getInteractionQueueTime(interaction) }) })
         .orderBy('_queueTime', 'desc')
         .thru(function (interactions) { return _.map(interactions, function (interaction) { return _.assign({}, interaction, { queueLength: interactions.length }); }); })
@@ -606,18 +626,41 @@ function updateQueueInfo() {
             ? { id: null, queueTime: 0, queueLength: 0 }
             : { id: interaction.id, queueTime: interaction._queueTime, queueLength: interaction.queueLength }
         })
-        .thru(function (queueInfo) { return _.assign({}, queueInfo, getDailyQueueData()); })
+        .thru(function (queueInfo) { return _.assign({}, queueInfo, getDailyQueueData(workgroupName)); })
         .value();
 }
 
 /**
+ * Updates the longest queue time and ID.
+ * @reuturn {{ csa: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }, partnerService: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number } }}
+ */
+function updateQueueInfo() {
+    __queueInfo = { csa: getQueueInfoData('CSA'), partnerService: getQueueInfoData('Partner Service') };
+    return __queueInfo;
+}
+
+/**
+ *
+ * @param {String} workgroupName
  * @return {{ abandonDate: Number, abandonedLength: Number, completedDate: Number }}
  */
-function getDailyQueueData() {
+function getDailyQueueData(workgroupName) {
     var _startdate = { $gte: moment().startOf('day').toDate(), $lte: moment().endOf('day').toDate(), };
 
-    var _abandoned = Interactions.find({ isAbandoned: true, startDate: _startdate });
-    var _completed = Interactions.find({ isCompleted: true, startDate: _startdate });
+    var _abandoned = Interactions.where(function (item) {
+        return _.every([
+            item.workgroup === workgroupName,
+            item.isAbandoned,
+            isToday(item),
+        ]);
+    });
+    var _completed = Interactions.where(function (item) {
+        return _.every([
+            item.workgroup === workgroupName,
+            item.isCompleted,
+            isToday(item),
+        ]);
+    });
 
     return {
         abandonRate: (((_abandoned.length / _completed.length) || 0) * 100).toFixed(2),
@@ -797,7 +840,9 @@ module.exports = {
     getInteractions: function () {
         return {
             activeInteractions: __activeInteractions,
-            _activeInteractions: Interactions.find({ isCurrent: true }),
+            _activeInteractions: Interactions.where(function (item) { return item.isCurrent; }),
+            csaInteractions: Interactions.where(function (item) { return item.workgroup === 'CSA', item.isCurrent }),
+            partnerServiceInteractions: Interactions.where(function (item) { return item.workgroup === 'Partner Service', item.isCurrent }),
             finishedInteractions: __finishedInteractions,
         }
     },
