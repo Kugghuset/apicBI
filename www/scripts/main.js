@@ -82,7 +82,6 @@ var app = new Vue({
 
           this.queueInfo = response.data.queueInfo;
           this.userInfo = response.data.userInfo;
-
         }, function (err) {
           console.log(err);
         }

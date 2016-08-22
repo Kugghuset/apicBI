@@ -6,7 +6,11 @@ var Promise = require('bluebird');
 var icwsSub = require('./icws.sub');
 var icwsStorage = require('./icws.storage');
 
+
+/** @type {LokiCollection<T>} */
 var Agents = icwsStorage.getCollection('agents');
+/** @type {LokiDynamicView<T>} */
+var AgentsInfoView = icwsStorage.getView(Agents, 'agentInfo', _.noop);
 
 /**
  * The __types to watch changes for.
@@ -169,7 +173,7 @@ function getAgentInfo(workgroups) {
     var _agents = Agents.where(function (agent) {
         return _.every([
             agent.isCurrent,
-            hasWorkgroup(agent, workgroups),
+            hasWorkgroups(agent, workgroups),
         ]);
     });
 
@@ -263,7 +267,7 @@ function isAvailable(agent, workgroups) {
         // The status must be 'Available'
         agent.statusName === 'Available',
         // And at least on of _workgroups must be agent.workgroups
-        hasWorkgroup(agent, workgroups),
+        hasWorkgroups(agent, workgroups),
         // _.some(_workgroups, function (wg) { return !!_.find(agent.workgroups, { name: wg }); }),
     ]);
 }
@@ -275,7 +279,7 @@ function isAvailable(agent, workgroups) {
  * @param {String[]|String} workgroups
  * @return {Boolean}
  */
-function hasWorkgroup(agent, workgroups) {
+function hasWorkgroups(agent, workgroups) {
     var _agentWorkgroups= _.isArray(agent)
         ? agent
         : agent.workgroups;
@@ -359,6 +363,19 @@ function userStatusSub(action, users) {
  */
 function setupStorage() {
     Agents = icwsStorage.getCollection('agents');
+    AgentsInfoView = icwsStorage.getView(Agents, 'agentInfo', function (view) {
+        /** @type {LokiDynamicView<T>} */
+        var _view = view;
+
+        _view.applyWhere(function (agent) {
+            return _.every([
+                agent.isCurrent,
+                hasWorkgroups(agent, ['CSA', 'Partner Service']),
+            ]);
+        }, 'filterTotal');
+
+        return _view;
+    });
 
     Agents.findAndUpdate(function () { return true; }, function (agent) {
         return _.assign(item, { isCurrent: false, });
@@ -389,7 +406,7 @@ module.exports = {
         return Agents.where(function (item) {
             return _.every([
                 item.isCurrent,
-                hasWorkgroup(item, ['CSA', 'Partner Service']),
+                hasWorkgroups(item, ['CSA', 'Partner Service']),
             ]);
         }).map(function (item) { return _.omit(item, ['$loki', 'meta']); });
     },

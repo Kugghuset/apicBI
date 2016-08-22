@@ -74,7 +74,7 @@ function init() {
  * and returned.
  *
  * @param {String} name Name of the collection to get
- * @return {LokiCollection}
+ * @return {LokiCollection<T>}
  */
 function getCollection(name) {
   return _.isNull(_storage.getCollection(name))
@@ -82,8 +82,43 @@ function getCollection(name) {
     : _storage.getCollection(name);
 }
 
+/**
+ * Gets the dynamic view at *name* from *coll*.
+ *
+ * If no dynamic view is foud at *name*, a new one
+ * is created and returned.
+ *
+ * @param {LokiCollection<T>} coll
+ * @param {String} name
+ * @param {Function} [viewInit]
+ * @return {LokiDynamicView<T>}
+ */
+function getView(coll, name, viewInit) {
+  var _viewInit = _.isFunction(viewInit)
+    ? viewInit
+    : _.noop;
+
+  // Get it's existance
+  var _isNull = _.isNull(coll.getDynamicView(name));
+
+  var _view = _isNull
+    ? coll.addDynamicView(name)
+    : coll.getDynamicView(name);
+
+  if (!_isNull) {
+    _view.removeFilters();
+  }
+
+  // Apply the initializations, if any
+  _viewInit(_view);
+
+  return _view;
+}
+
 module.exports = {
   init: init,
   getCollection: getCollection,
+  getView: getView,
   storage: _storage,
 }
+
