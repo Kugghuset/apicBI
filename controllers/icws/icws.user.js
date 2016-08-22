@@ -19,6 +19,15 @@ var _typeIds = {
     updateStatuses: 'urn:inin.com:status:userStatusMessage',
 }
 
+/**
+ * Data regarding agent availability.
+ */
+var __userInfo = {
+    csa: { agentCount: 0, availableAgentCount: 0 },
+    partnerService: { agentCount: 0, availableAgentCount: 0 },
+    total: { agentCount: 0, availableAgentCount: 0 },
+};
+
 // The complete list of users
 var _users = [];
 
@@ -62,28 +71,34 @@ function watch(dataArr) {
  */
 function updateUsers(data) {
     // Get all added users
-    var _added = _.map(data.added, function (user) {
-        return {
-            id: _.get(user, 'configurationId.id'),
-            name: _.get(user, 'configurationId.displayName'),
-            statusName: _.get(user, 'statusText'),
-            lastLocalChange: new Date(),
-            workgroups: _.map(_.get(user, 'workgroups'), function (wg) { return { id: wg.id, name: wg.displayName } }),
-        }
-    });
+    var _added = _.chain(data.added)
+        .map(function (user) {
+            return {
+                id: _.get(user, 'configurationId.id'),
+                name: _.get(user, 'configurationId.displayName'),
+                statusName: _.get(user, 'statusText'),
+                lastLocalChange: new Date(),
+                workgroups: _.map(_.get(user, 'workgroups'), function (wg) { return { id: wg.id, name: wg.displayName } }),
+            }
+        })
+        .map(getAvailability)
+        .value();
 
     // Get all removed users
     var _removed = _.map(data.removed, function (user) { return _.get(user, 'configurationId.id'); })
 
-    var _changed = _.map(data.changed, function (user) {
-        return {
-            id: _.get(user, 'configurationId.id'),
-            name: _.get(user, 'configurationId.displayName'),
-            statusName: _.get(user, 'statusText'),
-            lastLocalChange: new Date(),
-            workgroups: _.map(_.get(user, 'workgroups'), function (wg) { return { id: wg.id, name: wg.displayName } }),
-        };
-    });
+    var _changed = _.chain(data.changed)
+        .map(function (user) {
+            return {
+                id: _.get(user, 'configurationId.id'),
+                name: _.get(user, 'configurationId.displayName'),
+                statusName: _.get(user, 'statusText'),
+                lastLocalChange: new Date(),
+                workgroups: _.map(_.get(user, 'workgroups'), function (wg) { return { id: wg.id, name: wg.displayName } }),
+            };
+        })
+        .map(getAvailability)
+        .value();
 
     // Check if there are any changes in any of the arrays
     if (_.some([_added, _removed, _changed], _.some)) {
@@ -105,11 +120,63 @@ function updateUsers(data) {
             userStatusSub('subscribe', _addedIds);
         }
 
+        // Add or update users to the db.
+        _.forEach(_added.concat(_changed), function (user) {
+            var _agent = Agents.findOne({ id: _.toString(user.id) });
+
+            if (_agent) {
+                // There's an existing user, update it
+                _agent = _.assign(_agent, user);
+                Agents.update(_agent);
+            } else {
+                // Insert the new user!
+                Agents.insert(user);
+            }
+        });
+
         // If any removed, unsubscribe to their statuses
         if (_.some(_removed)) {
+            Agents.findAndUpdate(function (agent) {
+                return !!_.find(_removed, { configuration: { id: agent.id } });
+            }, function (agent) {
+                return _.assign(agent, { isCurrent: true });
+            });
+
             userStatusSub('unsubscribe', _removed);
         }
+
+        updateUserInfo();
     }
+}
+
+/**
+ * Updates the current user info (availability).
+ */
+function updateUserInfo() {
+    __userInfo = {
+        csa: getAgentInfo(['CSA']),
+        partnerService: getAgentInfo(['Partner Service']),
+        total: getAgentInfo(['CSA', 'Partner Service']),
+    };
+}
+
+/**
+ *
+ * @param {String[]|String} workgroups
+ * @return {{ agentCount: Number, availableAgentCount: Number }}
+ */
+function getAgentInfo(workgroups) {
+    var _agents = Agents.where(function (agent) {
+        return _.every([
+            agent.isCurrent,
+            hasWorkgroup(agent, workgroups),
+        ]);
+    });
+
+    return {
+        agentCount: _agents.length,
+        availableAgentCount: _.filter(_agents, function (agent) { return isAvailable(agent, workgroups); }).length,
+    };
 }
 
 /**
@@ -134,12 +201,97 @@ function updateStatuses(data) {
         // Find the user to update
         var _user = _.find(_users, { id: user.id });
 
+        // Find the persisted user
+        var _agent = Agents.findOne({ id: _.toString(user.id) });
+
+        // Get a joined user for checking availability
+        var _isAvailableUser = _.assign({}, user, { workgroups: _user.workgroups });
+
+        // Get the calculated updates
+        var _updates = _.assign({}, {
+            lastLocalChange: new Date(),
+            isCurrent: true,
+        }, getAvailability(_isAvailableUser));
+
         // Assign the changes to *_user* if it exists
         if (_user) {
-            _user = _.assign(_user, user, { lastLocalChange: new Date() });
-            console.log('{user} changed, {status}.'.replace('{user}', _user.id).replace('{status}', _user.statusName));
+            // Update the user
+            _user = _.assign(_user, user, _updates);
+        }
+
+        // If there is a user and a persisted user.
+        if (_agent) {
+            // Apply updates
+            _agent = _.assign(_agent, user, _updates);
+            Agents.update(_agent);
         }
     });
+
+    // If there are any updated statuses, update the user info.
+    if (_.some(_statUsers)) {
+        updateUserInfo();
+    }
+}
+
+/**
+ * Returns true or false for whether the agent is considered available or not.
+ *
+ * @param {{ loggedIn: Boolean, onPhone: Boolean, statusName: String, workgroups: { name: String }[] }} agent
+ * @return {Boolean}
+ */
+function getAvailability(agent) {
+    return _.assign({}, agent, {
+        isAvailableCsa: isAvailable(agent, ['CSA']),
+        isAvailablePartnerService: isAvailable(agent, ['Partner Service']),
+        isAvailable: isAvailable(agent, ['Partner Service', 'CSA']),
+    });
+}
+
+/**
+ * Returns true or false for whether the agent is considered available or not.
+ *
+ * @param {{ loggedIn: Boolean, onPhone: Boolean, statusName: String, workgroups: { name: String }[] }} agent
+ * @param {String[]|String} workgroups
+ * @return {Boolean}
+ */
+function isAvailable(agent, workgroups) {
+    return _.every([
+        // Must be logged in
+        agent.loggedIn,
+        // Must not be on the phone
+        !agent.onPhone,
+        // The status must be 'Available'
+        agent.statusName === 'Available',
+        // And at least on of _workgroups must be agent.workgroups
+        hasWorkgroup(agent, workgroups),
+        // _.some(_workgroups, function (wg) { return !!_.find(agent.workgroups, { name: wg }); }),
+    ]);
+}
+
+/**
+ * Returns true or false for whether *agent* contains any *workgroups*.
+ *
+ * @param {{ workgroups: { name: String }[] } | { name: String }[]} agent
+ * @param {String[]|String} workgroups
+ * @return {Boolean}
+ */
+function hasWorkgroup(agent, workgroups) {
+    var _agentWorkgroups= _.isArray(agent)
+        ? agent
+        : agent.workgroups;
+
+    var _workgroups = _.isArray(workgroups)
+        ? workgroups
+        : [ workgroups ];
+
+    return _.some(_workgroups, function (wg) { return !!_.find(_agentWorkgroups, { name: wg }) });
+}
+
+/**
+ * @return {}
+ */
+function getUserInfo() {
+
 }
 
 /*****************
@@ -234,6 +386,14 @@ module.exports = {
     watch: watch,
     setup: setup,
     getUsers: function () {
-        return _users;
+        return Agents.where(function (item) {
+            return _.every([
+                item.isCurrent,
+                hasWorkgroup(item, ['CSA', 'Partner Service']),
+            ]);
+        }).map(function (item) { return _.omit(item, ['$loki', 'meta']); });
+    },
+    getUserInfo: function () {
+        return __userInfo;
     },
 }

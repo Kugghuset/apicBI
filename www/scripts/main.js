@@ -16,6 +16,11 @@ var app = new Vue({
       interactions: [],
       queueInfo: { id: null, queueTime: 0, queueLength: 0, abandonedLength: 0, completedLength: 0, abandonRate: 0 },
       currentTime: moment().diff(moment().startOf('day'), 'seconds'),
+      userInfo: {
+        csa: { agentCount: 0, availableAgentCount: 0 },
+        partnerService: { agentCount: 0, availableAgentCount: 0 },
+        total: { agentCount: 0, availableAgentCount: 0 },
+      },
     };
   },
   computed: {
@@ -76,6 +81,7 @@ var app = new Vue({
               }.bind(this));
 
           this.queueInfo = response.data.queueInfo;
+          this.userInfo = response.data.userInfo;
 
         }, function (err) {
           console.log(err);

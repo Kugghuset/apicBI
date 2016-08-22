@@ -64,6 +64,7 @@
         <th>Workgroup</th>
         <th>Queue length</th>
         <th>Queue time</th>
+        <th>Available agents</th>
         <th>Completed calls</th>
         <th>Abandoned calls</th>
         <th>Abandon rate</th>
@@ -73,23 +74,13 @@
           <td>{{ workgroup === 'csa' ? 'CSA' : 'Partner Service' }}</td>
           <td>{{ queueInfo[workgroup].queueLength }}</td>
           <td>{{ formatTimer(queueInfo[workgroup].queueTime) }}</td>
+          <td>{{ userInfo[workgroup].availableAgentCount }}</td>
           <td>{{ queueInfo[workgroup].completedLength }}</td>
           <td>{{ queueInfo[workgroup].abandonedLength }}</td>
           <td>{{ queueInfo[workgroup].abandonRate + ' %' }}</td>
         </tr>
       </tbody>
     </table>
-
-<!--
-    <h1>Current queue time is {{ formatTimer(queueInfo.queueTime) }} ({{ queueInfo.queueLength }} calls in queue)</h1>
-    <h1>CSA queue time is {{ formatTimer(queueInfo.csa.queueTime) }} ({{ queueInfo.csa.queueLength }} calls in queue)</h1>
-    <h1>Partner Service queue time is {{ formatTimer(queueInfo.partnerService.queueTime) }} ({{ queueInfo.partnerService.queueLength }} calls in queue)</h1>
-
-    <h1>Number of abandoned calls, CSA: {{ queueInfo.csa.abandonedLength }}, Partner Service: {{ queueInfo.partnerService.abandonedLength }}</h1>
-    <h1>Number of completed calls, CSA: {{ queueInfo.csa.completedLength }}, Partner Service: {{ queueInfo.partnerService.completedLength }}</h1>
-    <h1>Abandon rate is {{ queueInfo.abandonRate }} %</h1>
-
-    <h1>Current time: {{ formatTimer(currentTime) }}</h1>-->
 
     <h1>{{ _availableUsers.length }} available agents</h1>
 
@@ -103,7 +94,7 @@
         <th colspan="4">Last change</th>
       </thead>
       <tbody>
-        <tr v-for="user in users | orderBy 'lastLocalChange' -1" :class="{ 'available': isAvailable(user) }">
+        <tr v-for="user in users | orderBy 'lastLocalChange' -1" :class="{ 'available': user.isAvailable }">
           <td colspan="4">{{ user.name }}</td>
           <td colspan="4">{{ user.statusName }}</td>
           <td colspan="2">{{ user.onPhone }}</td>

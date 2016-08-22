@@ -13,18 +13,18 @@ var icws = require('./lib/icwsModule');
 var app = express();
 var root = path.resolve();
 
-
 app.use(express.static(root + '/www'));
 
 var router = new express.Router();
 
 router.get('/api/resources', function (req, res) {
   var users = icwsCtrl.getUsers();
+  var userInfo = icwsCtrl.getUserInfo();
   var interactions = icwsCtrl.getInteractions();
   var queueInfo = icwsCtrl.getQueueInfo();
 
-  res.status(200).json({ users: users, interactions: interactions, queueInfo: queueInfo });
-})
+  res.status(200).json({ users: users, userInfo: userInfo, interactions: interactions, queueInfo: queueInfo });
+});
 
 router.get('/api/users', function (req, res) {
   var users = icwsCtrl.getUsers();
@@ -42,7 +42,7 @@ router.get('/api/queue-info', function (req, res) {
   var queueInfo = icwsCtrl.getQueueInfo();
 
   res.status(200).json(queueInfo);
-})
+});
 
 app.use(router);
 

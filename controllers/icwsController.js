@@ -30,6 +30,7 @@ function poll() {
     })
     .catch(function (err) {
         console.log('The following error occured when polling: ' + err.toString());
+        console.log(err.stack)
     })
 }
 
@@ -162,5 +163,6 @@ module.exports = {
     run: run,
     getUsers: icwsUser.getUsers,
     getInteractions: icwsWorkgroup.getInteractions,
+    getUserInfo: icwsUser.getUserInfo,
     getQueueInfo: icwsWorkgroup.getQueueInfo,
 };
