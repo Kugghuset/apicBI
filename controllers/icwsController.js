@@ -103,10 +103,6 @@ function stopPolling() {
  *
  * Returns a Promise of the ICWS object.
  *
- * TODO:
- *      - Add more subscriptions
- *      - Add handlers for new data and their respsective datatypes
- *
  * @return {Promise}
  */
 function run() {

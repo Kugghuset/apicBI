@@ -37,6 +37,10 @@ tr:not(:last-of-type) {
   border-bottom: 1px solid #b0b0b0;
 }
 
-tr.available {
+.available, .completed {
   background-color: #90EE90;
+}
+
+.failed {
+  background-color: #ff4c4c;
 }

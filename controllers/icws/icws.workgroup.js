@@ -18,7 +18,7 @@ var icwsStorage = require('./icws.storage');
 /**
  * @type {LokiCollection<{}>}
  */
-var Interactions = icwsStorage.getCollection('interactions');;
+var Interactions = icwsStorage.getCollection('interactions');
 
 /**
  * @type {LokiCollection<{}>}
@@ -118,6 +118,7 @@ function watch(dataArr) {
     });
 
     _.forEach(__activeInteractions, updateCalculatedValues);
+
     updateQueueInfo();
 }
 
@@ -508,6 +509,12 @@ function updateCalculatedValues(interaction, index) {
         interaction.isAbandoned = false;
     }
 
+    if (isCompleted(interaction) && !interaction.isCompleted) {
+        interaction.isCompleted = true;
+    } else if (!isCompleted(interaction) && interaction.isCompleted) {
+        interaction.isCompleted = false;
+    }
+
     // Set _queueTime to either the time diff returned form getInteractionQueueTime or the actual queueTime.
     if (interaction.inQueue) {
         _queueTime = getInteractionQueueTime(interaction);
@@ -660,7 +667,7 @@ function getDailyQueueData(workgroupName) {
     });
 
     return {
-        abandonRate: (((_abandoned.length / _completed.length) || 0) * 100).toFixed(2),
+        abandonRate: ((_abandoned.length / (_completed.length || 1)) * 100).toFixed(2),
         abandonedLength: _abandoned.length,
         completedLength: _completed.length,
     }

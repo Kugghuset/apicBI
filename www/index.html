@@ -36,7 +36,7 @@
         <!--<th>Is completed</th>-->
       </thead>
       <tbody>
-        <tr v-for="interaction in interactions | orderBy 'queueDate'" :class="{ 'available': interaction.isCompleted }">
+        <tr v-for="interaction in interactions | orderBy 'queueDate'" :class="{ 'completed': interaction.isCompleted, 'failed': interaction.isAbandoned }">
           <!--<td>{{ interaction.id }}</td>-->
           <td>{{ interaction.user.name || interaction.userName }}</td>
           <td>{{ interaction.remoteAddress }}</td>
