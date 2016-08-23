@@ -173,7 +173,8 @@ function getAgentInfo(workgroups) {
     var _agents = Agents.where(function (agent) {
         return _.every([
             agent.isCurrent,
-            hasWorkgroups(agent, workgroups),
+            // hasWorkgroups(agent, workgroups),
+            hasWorkgroupsSpecial(agent, workgroups),
         ]);
     });
 
@@ -267,8 +268,12 @@ function isAvailable(agent, workgroups) {
         // The status must be 'Available'
         agent.statusName === 'Available',
         // And at least on of _workgroups must be agent.workgroups
-        hasWorkgroups(agent, workgroups),
-        // _.some(_workgroups, function (wg) { return !!_.find(agent.workgroups, { name: wg }); }),
+        // hasWorkgroups(agent, workgroups),
+        /**
+         * If CSA is in workgroups and not Partner Service
+         * filter it out.
+         */
+        hasWorkgroupsSpecial(agent, workgroups),
     ]);
 }
 
@@ -289,6 +294,30 @@ function hasWorkgroups(agent, workgroups) {
         : [ workgroups ];
 
     return _.some(_workgroups, function (wg) { return !!_.find(_agentWorkgroups, { name: wg }) });
+}
+
+/**
+ * @param {{ loggedIn: Boolean, onPhone: Boolean, statusName: String, workgroups: { name: String }[] }} agent
+ * @param {String[]|String} workgroups
+ * @return {Boolean}
+ */
+function hasWorkgroupsSpecial(agent, workgroups) {
+    var _workgroups = _.isArray(workgroups)
+        ? workgroups
+        : [ workgroups ];
+
+    var _isCSA = _.every([
+        !!_.find(_workgroups, 'CSA'),
+        !_.find(_workgroups, 'Partner Service'),
+        hasWorkgroups(agent, 'CSA'),
+        !hasWorkgroups(agent, 'Partner Service'),
+    ])
+    // Special rules for non Parter Service calls
+    if (_isCSA) {
+        return true;
+    }
+
+    return hasWorkgroups(agent, _workgroups);
 }
 
 /**
