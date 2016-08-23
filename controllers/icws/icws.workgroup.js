@@ -25,7 +25,7 @@ var Interactions = icwsStorage.getCollection('interactions');
  */
 var WorkStations = icwsStorage.getCollection('workstations');
 
-var TimeDiffs = icwsStorage.getCollection('timeDiffs');
+var TimeDiffView = icwsStorage.getView(Interactions, 'timeDiffView', initTimeDiffView);
 
 /**
  * TODO:
@@ -134,7 +134,11 @@ function updateInteractions(data) {
         __activeInteractions = __activeInteractions.concat(_.map(_added, function (interaction) {
             // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
             if (canCalculateQueueTime(interaction)) {
-                interaction.queueTime = getDateDiff(interaction.queueDate, interaction.connectedDate, 'seconds');
+                var _lastDate = isAbandoned(interaction)
+                    ? interaction.endDate
+                    : interaction.connectedDate;
+
+                interaction.queueTime = getDateDiff(interaction.queueDate, _lastDate, 'seconds');
             }
 
             return interaction;
@@ -145,7 +149,11 @@ function updateInteractions(data) {
          */
         _.forEach(_added, function (interaction) {
             if (canCalculateQueueTime(interaction)) {
-                interaction.queueTime = getDateDiff(interaction.queueDate, interaction.connectedDate, 'seconds');
+                var _lastDate = isAbandoned(interaction)
+                    ? interaction.endDate
+                    : interaction.connectedDate;
+
+                interaction.queueTime = getDateDiff(interaction.queueDate, _lastDate, 'seconds');
             }
 
             var _updated = Interactions.findOne({ id: _.toString(interaction.id) });
@@ -450,44 +458,17 @@ function getDateDiff(date1, date2, granularity, skipAbs) {
  * @return {Number}
  */
 function getGlobalTimeDiff() {
-
     /**
      * TODO:
      * - figure out why the time diff keep getting smaller
      */
-
-    var _diffs = Interactions
-        .chain()
-        .where(function (item) { return moment().subtract(7, 'days').isBefore(item.startDate); })
-        .where(function (item) { return !item.inQueue; })
-        .where(function (item) { return _.every([item.localQueueTime, item.queueTime], _.isNumber); })
-
-        // .simplesort('$loki', true)
-        // .limit(10)
-        .simplesort('$loki', true)
-        // .limit(10)
+    var _diffs = TimeDiffView
         .data()
-        // .filter(function (item) { return !item.inQueue; })
-        // .filter(function (item) { return _.every([item.localQueueTime, item.queueTime], _.isNumber); })
-        .map(function (item) { return item.localQueueTime - item.queueTime; })
-        .sort(function (a, b) {
-            return a === b
-                ? 0
-                : (a < b ? 1 : -1);
-        })
-        // .filter(function (item, index, coll) {
-        //     return (
-        //         coll.length < 5
-        //             ? false
-        //             : (coll.length * 0.2 < index && index < coll.length * 0.8)
-        //     );
-        // });
+        .map(function (item) { return item.localQueueTime - item.queueTime });
 
     if (!_.some(_diffs)) {
         return 0;
     }
-
-    console.log(_diffs)
 
     return _.sum(_diffs) / _diffs.length;
 }
@@ -496,7 +477,7 @@ function getGlobalTimeDiff() {
  * Updates *interaction* with the following properties:
  * - inQueue (boolean value of whether the *interaction* is in queue or not.)
  * - correctedQueueTime (calculated time diff between queueDate and Date.now or the actual queueTime (connectedDate - queueDate))
- * - localQueueTime (calculated between queueDate and now, only set when the diff won't grow)
+ * - localQueueTime (calculated between queueDate and now)
  *
  * @param {Object} interaction The interaction object to get values from
  * @param {Number} index Index of the interaction
@@ -581,7 +562,11 @@ function isInQueue(interaction) {
  * @return {Boolean} Whether the *interaction* has queueTime or not.
  */
 function canCalculateQueueTime(interaction) {
-    return _.isUndefined(interaction.queueTime) && !_.some([interaction.queueDate, interaction.connectedDate], _.isUndefined);
+    return _.every([
+        _.isUndefined(interaction.queueTime),
+        !_.isUndefined(interaction.queueDate),
+        _.some([interaction.connectedDate, interaction.endDate], isParsableOrDate),
+    ]);
 }
 
 /**
@@ -813,12 +798,30 @@ function queueSub(action, subId, workstations) {
 }
 
 /**
+ * @param {LokiDynamicView<T>} view
+ * @return {LokiDynamicView<T>}
+ */
+function initTimeDiffView(view) {
+    return view
+        .applyWhere(function (item) { return moment().subtract(7, 'days').isBefore(item.startDate); })
+        .applyWhere(function (item) { return !item.inQueue; })
+        .applyWhere(function (item) { return _.every([item.localQueueTime, item.queueTime], _.isNumber); })
+        .applySort(function (a, b) {
+            var _a = a.localQueueTime - a.queueTime;
+            var _b = b.localQueueTime - b.queueTime;
+            return _a === _b
+                ? 0
+                : (_a < _b ? 1 : -1);
+        });
+}
+
+/**
  * Sets up the stored data.
  */
 function setupStorage() {
     Interactions = icwsStorage.getCollection('interactions');
     WorkStations = icwsStorage.getCollection('workstations');
-    TimeDiffs = icwsStorage.getCollection('timeDiffs');
+    TimeDiffView = icwsStorage.getView(Interactions, 'timeDiffView', initTimeDiffView);
 
     // Update all values
     Interactions.findAndUpdate(function () { return true; }, function (item) {
@@ -830,16 +833,6 @@ function setupStorage() {
             // localQueueTime: null,
         });
     });
-
-    Interactions
-        .chain()
-        .find({})
-        .simplesort('$loki', true)
-        .limit(10)
-        .data()
-        .forEach(function (item) {
-            console.log(moment(item.startDate).format('YYYY-MM-DD HH:mm'));
-        });
 }
 
 /**
