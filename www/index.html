@@ -26,12 +26,14 @@
         <th>Call type</th>
         <th>Start date</th>
         <!--<th>Reference date</th>-->
-        <th>End date</th>
-        <th>Duration (seconds)</th>
+        <!--<th>End date</th>-->
+        <!--<th>Duration (seconds)</th>-->
         <th>Date queued</th>
         <th>Date connected</th>
         <th>Time queued</th>
+        <th>Corr. time queued</th>
         <th>Calc. time queued</th>
+        <th>W/ diff</th>
         <!--<th>Is abandoned</th>-->
         <!--<th>Is completed</th>-->
       </thead>
@@ -45,12 +47,14 @@
           <td>{{ interaction.callType + ' (' + (interaction.callDirection || 'missing') + ')' }}</td>
           <td>{{ interaction.startDate | date 'HH:mm:ss' }}</td>
           <!--<td>{{ interaction.referenceDate | date 'HH:mm:ss' }}</td>-->
-          <td>{{ interaction.endDate | date 'HH:mm:ss' }}</td>
-          <td>{{ interaction.duration > 0 ? formatTimer(interaction.duration) : 'pending' }}</td>
+          <!--<td>{{ interaction.endDate | date 'HH:mm:ss' }}</td>-->
+          <!--<td>{{ interaction.duration > 0 ? formatTimer(interaction.duration) : 'pending' }}</td>-->
           <td>{{ interaction.queueDate | date 'YYYY-MM-DD HH:mm:ss' }}</td>
           <td>{{ interaction.connectedDate | date 'YYYY-MM-DD HH:mm:ss' }}</td>
           <td>{{ interaction.queueTime > 0 ? formatTimer(interaction.queueTime) : (!!interaction.endDate ? 'abandoned call' : 'in queue') }}</td>
-          <td>{{ interaction.__queueTime > 0 ? formatTimer(interaction.__queueTime) : formatTimer(interaction._queueTime) }}</td>
+          <td>{{ formatTimer(interaction.correctedQueueTime) }}</td>
+          <td>{{ interaction.localQueueTime > 0 ? formatTimer(interaction.localQueueTime) : 'missing' }}</td>
+          <td>{{ interaction.localQueueTime > 0 ? formatTimer(interaction.localQueueTime - queueInfo.timeDiff) : 'missing' }}</td>
           <!--<td>{{ !!interaction.isAbandoned ? interaction.isAbandoned : false }}</td>-->
           <!--<td>{{ !!interaction.isCompleted ? interaction.isCompleted : false }}</td>-->
         </tr>
@@ -58,6 +62,8 @@
     </table>
 
     <h1>Daily queue info</h1>
+
+    <h2>Time diff (seconds): {{ formatTimer(queueInfo.timeDiff) }}</h2>
 
     <table>
       <thead>

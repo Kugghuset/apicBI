@@ -12,7 +12,7 @@ var icws = require('../../lib/icwsModule');
 var icwsStorage = require('./icws.storage');
 
 /**
- * TODO: Ensure isCompleted and isAbandoned properly is stored.
+ * Remember to turn back time a minute on the dev laptop.
  */
 
 /**
@@ -68,18 +68,6 @@ var __completedCalls = [];
 var __localTimeDiff = null;
 
 /**
- * Array of time diffs between queueTime based on ININ data (queueDate - connectedDate)
- * and calculated queue time (localQueueTime).
- *
- * Used for better handle current queue time.
- *
- * __localTimeDiff should be set to the mean value of the current day's diff.
- *
- * @type {Number[]}
- */
-var __timeDiffs = [];
-
-/**
  * Object containing information about the queues.
  *
  * @type { csa: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }, partnerService: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number } }
@@ -107,7 +95,7 @@ function watch(dataArr) {
         .map(function (__type, key) {
             var _data = _.find(dataArr, function (data) { return _.get(data, '__type') === __type });
             // If there is *_data*, return an object where *key* is the key and *_data* is the value.
-            return !!_data
+            return !_.isUndefined(_data)
                 ? _.set({}, key, _data)
                 : undefined;
         })
@@ -462,70 +450,61 @@ function getDateDiff(date1, date2, granularity, skipAbs) {
  * @return {Number}
  */
 function getGlobalTimeDiff() {
-    var _diffs = Interactions.chain()
-        .where(function (item) { return isToday(item); })
+
+    /**
+     * TODO:
+     * - figure out why the time diff keep getting smaller
+     */
+
+    var _diffs = Interactions
+        .chain()
+        .where(function (item) { return moment().subtract(7, 'days').isBefore(item.startDate); })
+        .where(function (item) { return !item.inQueue; })
+        .where(function (item) { return _.every([item.localQueueTime, item.queueTime], _.isNumber); })
+
+        // .simplesort('$loki', true)
+        // .limit(10)
+        .simplesort('$loki', true)
+        // .limit(10)
         .data()
-        .filter(function (item) { return !item.inQueue; })
-        .map(function (item) { return item.localQueueTime - item.calculatedQueueTime; })
+        // .filter(function (item) { return !item.inQueue; })
+        // .filter(function (item) { return _.every([item.localQueueTime, item.queueTime], _.isNumber); })
+        .map(function (item) { return item.localQueueTime - item.queueTime; })
         .sort(function (a, b) {
             return a === b
                 ? 0
                 : (a < b ? 1 : -1);
         })
-        .filter(function (item, index, coll) {
-            return (
-                coll.length < 10
-                    ? false
-                    : (coll.length * 0.2 < index && index < coll.length * 0.8)
-            );
-        });
+        // .filter(function (item, index, coll) {
+        //     return (
+        //         coll.length < 5
+        //             ? false
+        //             : (coll.length * 0.2 < index && index < coll.length * 0.8)
+        //     );
+        // });
 
     if (!_.some(_diffs)) {
         return 0;
     }
 
+    console.log(_diffs)
+
     return _.sum(_diffs) / _diffs.length;
-}
-
-/**
- * Updates the local time differance variable if it's either null or higher
- * than the diff between startDate and referenceDate of *interaction*.
- *
- * @param {Object} interaction The interaction object to get values from
- */
-function updateLocalTimeDiff(interaction) {
-    //  Get the differance
-    var _timeDiffStart = getDateDiff(interaction.referenceDate, interaction.startDate, 'milliseconds', true);
-    var _timeDiffEnd = !_.isUndefined(interaction.endDate) ? null : getDateDiff(interaction.referenceDate, interaction.endDate, 'milliseconds', true);
-
-    var currentLocalDiff = __localTimeDiff;
-
-    // If __localTimeDiff is null or higher, correct it with _timeDiff
-    if (_.isNull(__localTimeDiff) || Math.abs(_timeDiffStart) < Math.abs(__localTimeDiff)) {
-        __localTimeDiff = _timeDiffStart;
-    }
-
-    if (!_.isNull(_timeDiffEnd) && Math.abs(_timeDiffEnd) < Math.abs(__localTimeDiff)) {
-        __localTimeDiff = _timeDiffEnd;
-    }
-
-    if (currentLocalDiff !== __localTimeDiff) {
-        console.log('Local time differance updated to: {timediff} ms'.replace('{timediff}', __localTimeDiff));
-    }
 }
 
 /**
  * Updates *interaction* with the following properties:
  * - inQueue (boolean value of whether the *interaction* is in queue or not.)
- * - calculatedQueueTime (calculated time diff between queueDate and Date.now or the actual queueTime (connectedDate - queueDate))
+ * - correctedQueueTime (calculated time diff between queueDate and Date.now or the actual queueTime (connectedDate - queueDate))
  * - localQueueTime (calculated between queueDate and now, only set when the diff won't grow)
  *
  * @param {Object} interaction The interaction object to get values from
  * @param {Number} index Index of the interaction
  */
 function updateCalculatedValues(interaction, index) {
-    // Create a variable for calculatedQueueTime to be used.
-    var calculatedQueueTime;
+    // Create a variable for correctedQueueTime to be used.
+    var _correctedQueueTime;
+    var _localQueueTime;
 
     // Get the persisted interaction
     var _storedInteraction = Interactions.findOne({ id: _.toString(interaction.id) });
@@ -549,24 +528,21 @@ function updateCalculatedValues(interaction, index) {
         interaction.isCompleted = false;
     }
 
-    // Set calculatedQueueTime to either the time diff returned form getInteractionQueueTime or the actual queueTime.
+    // Set correctedQueueTime to either the time diff returned form getInteractionQueueTime or the actual queueTime.
     if (interaction.inQueue) {
-        calculatedQueueTime = getInteractionQueueTime(interaction);
+        _correctedQueueTime = getInteractionQueueTime(interaction, true);
+        _localQueueTime = getInteractionQueueTime(interaction, false);
     } else {
-        calculatedQueueTime = interaction.queueTime || 0;
+        _correctedQueueTime = interaction.queueTime || 0;
+        _localQueueTime = _storedInteraction.localQueueTime || interaction.localQueueTime;
     }
 
     // Update the activeTime
-    var _updated = _.assign(interaction, { calculatedQueueTime: calculatedQueueTime });
+    var _updated = _.assign(interaction, { correctedQueueTime: _correctedQueueTime, localQueueTime: _localQueueTime });
 
-    // If localQueueTime (calculated queueTime) is undefined and the *interaction* is not in queue, set localQueueTime.
-    if (_.isUndefined(_updated.localQueueTime) && !interaction.inQueue) {
-        interaction.localQueueTime = !!_.get(_storedInteraction, 'localQueueTime')
-            ? _.get(_storedInteraction, 'localQueueTime')
-            : getInteractionQueueTime(interaction);
-
-        // Push the diff to __timeDiffs to store it.
-        __timeDiffs.push(interaction.localQueueTime - interaction.calculatedQueueTime);
+    // If localQueueTime (calculated queueTime) is undefined and the *interaction* is not in queue, set localQueueTime to null.
+    if (_.isUndefined(_updated.localQueueTime) && !_updated.inQueue) {
+        _updated.localQueueTime = null;
     }
 
     // Replace the item in the list.
@@ -596,7 +572,7 @@ function isInQueue(interaction) {
     return !_.some([
         !_.isUndefined(interaction.queueTime),
         isParsableOrDate(interaction.endDate),
-        interaction.callDirection !== 'inbound'
+        interaction.callDirection !== 'inbound',
     ]);
 }
 
@@ -605,7 +581,7 @@ function isInQueue(interaction) {
  * @return {Boolean} Whether the *interaction* has queueTime or not.
  */
 function canCalculateQueueTime(interaction) {
-    return  _.isUndefined(interaction.queueTime) && !_.some([interaction.queueDate, interaction.connectedDate], _.isUndefined);
+    return _.isUndefined(interaction.queueTime) && !_.some([interaction.queueDate, interaction.connectedDate], _.isUndefined);
 }
 
 /**
@@ -655,14 +631,14 @@ function getQueueInfoData(workgroupName) {
         item.workgroup === workgroupName,
         item.inQueue,
     ])}))
-        .map(function (interaction) { return _.assign({}, interaction, { calculatedQueueTime: getInteractionQueueTime(interaction) }) })
-        .orderBy('calculatedQueueTime', 'desc')
+        .map(function (interaction) { return _.assign({}, interaction, { correctedQueueTime: getInteractionQueueTime(interaction, true) }) })
+        .orderBy('correctedQueueTime', 'desc')
         .thru(function (interactions) { return _.map(interactions, function (interaction) { return _.assign({}, interaction, { queueLength: interactions.length }); }); })
         .first()
         .thru(function (interaction) {
             return _.isUndefined(interaction)
             ? { id: null, queueTime: 0, queueLength: 0 }
-            : { id: interaction.id, queueTime: interaction.calculatedQueueTime, queueLength: interaction.queueLength }
+            : { id: interaction.id, queueTime: interaction.correctedQueueTime, queueLength: interaction.queueLength }
         })
         .thru(function (queueInfo) { return _.assign({}, queueInfo, getDailyQueueData(workgroupName)); })
         .value();
@@ -673,7 +649,7 @@ function getQueueInfoData(workgroupName) {
  * @reuturn {{ csa: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }, partnerService: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number } }}
  */
 function updateQueueInfo() {
-    __queueInfo = { csa: getQueueInfoData('CSA'), partnerService: getQueueInfoData('Partner Service') };
+    __queueInfo = { csa: getQueueInfoData('CSA'), partnerService: getQueueInfoData('Partner Service'), timeDiff: __localTimeDiff };
     return __queueInfo;
 }
 
@@ -710,13 +686,19 @@ function getDailyQueueData(workgroupName) {
 /**
  *
  * @param {Object} interaction The interaction object to get values from
+ * @param {Boolean} [useGlobalTimeDiff = false]
  * @return {Number}
  */
-function getInteractionQueueTime(interaction) {
-    // Should be less than.
-    var _timeDiff = getDateDiff(interaction.referenceDate, interaction.queueDate, 'milliseconds', true);
+function getInteractionQueueTime(interaction, useGlobalTimeDiff) {
+    useGlobalTimeDiff = _.isUndefined(useGlobalTimeDiff)
+        ? false
+        : useGlobalTimeDiff;
 
-    var _globalTimeDiff = getGlobalTimeDiff();
+    __localTimeDiff = getGlobalTimeDiff();
+
+    var _globalTimeDiff = useGlobalTimeDiff
+        ? __localTimeDiff // getGlobalTimeDiff()
+        : 0;
 
     return moment(new Date()).diff(interaction.queueDate, 'seconds') - _globalTimeDiff;
 }
@@ -844,9 +826,20 @@ function setupStorage() {
             isCurrent: false,
             inQueue: isInQueue(item),
             isAbandoned: isAbandoned(item),
-            isCompleted: isCompleted(item)
+            isCompleted: isCompleted(item),
+            // localQueueTime: null,
         });
     });
+
+    Interactions
+        .chain()
+        .find({})
+        .simplesort('$loki', true)
+        .limit(10)
+        .data()
+        .forEach(function (item) {
+            console.log(moment(item.startDate).format('YYYY-MM-DD HH:mm'));
+        });
 }
 
 /**
@@ -862,6 +855,8 @@ function setup(subId) {
         : 'kugghuset-1';
 
     setupStorage();
+
+    __localTimeDiff = getGlobalTimeDiff();
 
     return workStationSub('subscribe', subId);
 }
