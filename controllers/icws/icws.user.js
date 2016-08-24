@@ -40,7 +40,6 @@ var __acceptedWorkgroups = [
  * @type {String[]}
  */
 var __disallowedWorkgroups = [
-    'Sales Finland',
 ];
 
 /**
