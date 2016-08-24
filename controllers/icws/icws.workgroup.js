@@ -134,11 +134,7 @@ function updateInteractions(data) {
         __activeInteractions = __activeInteractions.concat(_.map(_added, function (interaction) {
             // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
             if (canCalculateQueueTime(interaction)) {
-                var _lastDate = isAbandoned(interaction)
-                    ? interaction.endDate
-                    : interaction.connectedDate;
-
-                interaction.queueTime = getDateDiff(interaction.queueDate, _lastDate, 'seconds');
+                interaction.queueTime = calculateQueueTime(interaction);
             }
 
             return interaction;
@@ -149,11 +145,7 @@ function updateInteractions(data) {
          */
         _.forEach(_added, function (interaction) {
             if (canCalculateQueueTime(interaction)) {
-                var _lastDate = isAbandoned(interaction)
-                    ? interaction.endDate
-                    : interaction.connectedDate;
-
-                interaction.queueTime = getDateDiff(interaction.queueDate, _lastDate, 'seconds');
+                interaction.queueTime = calculateQueueTime(interaction);
             }
 
             var _updated = Interactions.findOne({ id: _.toString(interaction.id) });
@@ -182,7 +174,7 @@ function updateInteractions(data) {
 
                 // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
                 if (canCalculateQueueTime(_updated)) {
-                    _updated.queueTime = getDateDiff(_updated.queueDate, _updated.connectedDate, 'seconds');
+                    _updated.queueTime = calculateQueueTime(_updated);
                 }
 
                 // Splice in the updated version instead of the original item
@@ -213,7 +205,7 @@ function updateInteractions(data) {
 
             // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
             if (canCalculateQueueTime(_updated)) {
-                _updated.queueTime = getDateDiff(_updated.queueDate, _updated.connectedDate, 'seconds');
+                _updated.queueTime = calculateQueueTime(_updated);
             }
 
             if (isAbandoned(_updated) && !_updated.isAbandoned) {
@@ -432,6 +424,20 @@ function getDate(interaction, dateType) {
     return _date;
 }
 
+/**
+ * Calculates the queue time, until the call is connected (if answered) or ended (abandoned)
+ * and returns it in seconds.
+ *
+ * @param {{ endDate: Date, connectedDate: Date, queueDate: Date, state: String }} interaction
+ * @return {Number}
+ */
+function calculateQueueTime(interaction) {
+    var _lastDate = isAbandoned(interaction)
+        ? interaction.endDate
+        : interaction.connectedDate;
+
+    return getDateDiff(interaction.queueDate, _lastDate, 'seconds');
+}
 
 /**
  * @param {Object} interaction The interaction object to get values from
