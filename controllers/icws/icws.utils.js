@@ -285,6 +285,7 @@ module.exports = {
     isAbandoned: isAbandoned,
     isCompleted: isCompleted,
     isToday: isToday,
+    isThisWeek: isThisWeek,
     getDateDiff: getDateDiff,
     calculateQueueTime: calculateQueueTime,
     compareQueueDiff: compareQueueDiff,

@@ -8,27 +8,52 @@ var moment = require('moment');
 var loki = require('lokijs');
 
 var utils = require('./../../lib/utils');
+var icwsUtils = require('./icws.utils');
+var schedules = require('./icws.schedules');
 
 var _dbPath = path.resolve(__dirname, '../../assets/icws-storage.json');
 var _isLoaded = false;
 
 // If there is no database file, create it
 if (!fs.existsSync(_dbPath)) {
-  console.log('Creating local storage for icws in memory database.');
-  fs.writeFileSync(_dbPath, '');
+    console.log('Creating local storage for icws in memory database.');
+    fs.writeFileSync(_dbPath, '');
 }
 
 var _storage = new loki(_dbPath, { autosave: true, autosaveInterval: 100, autoloadCallback: onLoaded, autoload: true });
 
 function onLoaded(err) {
-  if (err) {
-    console.log(err);
-  } else {
-    console.log('Database loaded');
-    _isLoaded = true;
+    if (err) {
+        console.log(err);
+    } else {
+        console.log('Database loaded automatically');
+        _isLoaded = true;
+        setupWeekly();
+    }
+}
 
-    var Interactions = _storage.getCollection('interactions');
-  }
+/**
+ * Sets up all weekly events for collections.
+ */
+function setupWeekly() {
+    _storage.listCollections().forEach(function (item) {
+        var name = item.name;
+
+        schedules.setWeekly(name, function () {
+            var _coll = getCollection(name);
+
+            /**
+             * TODO: Remove any documents older than a week.
+             */
+
+            _coll.removeWhere(function (item) {
+                return _.every([
+                    !item.isCurrent,
+                    moment().diff(new Date(item.))
+                ]);
+            })
+        });
+    });
 }
 
 /**
@@ -39,32 +64,35 @@ function onLoaded(err) {
  * @return {Promise<Loki>}
  */
 function init() {
-  return new Promise(function (resolve, reject) {
-    // Check if it's loaded already
-    if (_isLoaded) {
-      console.log('Database is already loaded')
-      return resolve(_storage);
-    }
+    return new Promise(function (resolve, reject) {
+        // Check if it's loaded already
+        if (_isLoaded) {
+            console.log('Database is already loaded')
+            return resolve(_storage);
+        }
 
-    // If there is no database file, create it
-    if (!fs.existsSync(_dbPath)) {
-      console.log('Creating local storage for icws in memory database.');
-      fs.writeFileSync(_dbPath, '');
-    }
+        // If there is no database file, create it
+        if (!fs.existsSync(_dbPath)) {
+            console.log('Creating local storage for icws in memory database.');
+            fs.writeFileSync(_dbPath, '');
+        }
 
 
-    // Load the db from disk.
-    _storage.loadDatabase({}, function (err) {
-      if (err) {
-        console.log('Something went wrong when setting up the database: ' + err.toString());
-        return reject(err);
-      }
+        // Load the db from disk.
+        _storage.loadDatabase({}, function (err) {
+            if (err) {
+                console.log('Something went wrong when setting up the database: ' + err.toString());
+                return reject(err);
+            }
 
-      _isLoaded = true;
+            console.log('Database loaded manually');
 
-      resolve(_storage);
+            _isLoaded = true;
+            setupWeekly();
+
+            resolve(_storage);
+        });
     });
-  });
 }
 
 /**
@@ -77,9 +105,9 @@ function init() {
  * @return {LokiCollection<T>}
  */
 function getCollection(name) {
-  return _.isNull(_storage.getCollection(name))
-    ? _storage.addCollection(name)
-    : _storage.getCollection(name);
+    return _.isNull(_storage.getCollection(name))
+        ? _storage.addCollection(name)
+        : _storage.getCollection(name);
 }
 
 /**
@@ -94,31 +122,30 @@ function getCollection(name) {
  * @return {LokiDynamicView<T>}
  */
 function getView(coll, name, viewInit) {
-  var _viewInit = _.isFunction(viewInit)
-    ? viewInit
-    : _.noop;
+    var _viewInit = _.isFunction(viewInit)
+        ? viewInit
+        : _.noop;
 
-  // Get it's existance
-  var _isNull = _.isNull(coll.getDynamicView(name));
+    // Get it's existance
+    var _isNull = _.isNull(coll.getDynamicView(name));
 
-  var _view = _isNull
-    ? coll.addDynamicView(name)
-    : coll.getDynamicView(name);
+    var _view = _isNull
+        ? coll.addDynamicView(name)
+        : coll.getDynamicView(name);
 
-  if (!_isNull) {
-    _view.removeFilters();
-  }
+    if (!_isNull) {
+        _view.removeFilters();
+    }
 
-  // Apply the initializations, if any
-  _viewInit(_view);
+    // Apply the initializations, if any
+    _viewInit(_view);
 
-  return _view;
+    return _view;
 }
 
 module.exports = {
-  init: init,
-  getCollection: getCollection,
-  getView: getView,
-  storage: _storage,
+    init: init,
+    getCollection: getCollection,
+    getView: getView,
+    storage: _storage,
 }
-
