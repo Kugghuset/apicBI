@@ -18,10 +18,30 @@ var AgentsInfoView = icwsStorage.getView(Agents, 'agentInfo', _.noop);
  * The keys matches function used for processing the data,
  * and the values matches the __type properties from ININ.
  */
-var _typeIds = {
+var __typeIds = {
     updateUsers: 'urn:inin.com:configuration.people:usersMessage',
     updateStatuses: 'urn:inin.com:status:userStatusMessage',
 }
+
+/**
+ * Array of accepted workgroups.
+ *
+ * @type {String[]}
+ */
+var __acceptedWorkgroups = [
+    'CSA',
+    'Partner Service',
+    // 'ZendeskTest', // possibly
+];
+
+/**
+ * Array of not accepted workgroups.
+ *
+ * @type {String[]}
+ */
+var __disallowedWorkgroups = [
+    'Sales Finland',
+];
 
 /**
  * Data regarding agent availability.
@@ -49,7 +69,7 @@ var watchers = {
  */
 function watch(dataArr) {
     // Find all functions to call
-    var toCall = _.chain(_typeIds)
+    var toCall = _.chain(__typeIds)
         .map(function (__type, key) {
             var _data = _.find(dataArr, function (data) { return _.get(data, '__type') === __type });
             // If there is *_data*, return an object where *key* is the key and *_data* is the value.
@@ -160,7 +180,7 @@ function updateUserInfo() {
     __userInfo = {
         csa: getAgentInfo(['CSA']),
         partnerService: getAgentInfo(['Partner Service']),
-        total: getAgentInfo(['CSA', 'Partner Service']),
+        total: getAgentInfo(__acceptedWorkgroups),
     };
 }
 
@@ -173,7 +193,6 @@ function getAgentInfo(workgroups) {
     var _agents = Agents.where(function (agent) {
         return _.every([
             agent.isCurrent,
-            // hasWorkgroups(agent, workgroups),
             hasWorkgroupsSpecial(agent, workgroups),
         ]);
     });
@@ -248,7 +267,7 @@ function getAvailability(agent) {
     return _.assign({}, agent, {
         isAvailableCsa: isAvailable(agent, ['CSA']),
         isAvailablePartnerService: isAvailable(agent, ['Partner Service']),
-        isAvailable: isAvailable(agent, ['Partner Service', 'CSA']),
+        isAvailable: isAvailable(agent, __acceptedWorkgroups),
     });
 }
 
@@ -267,12 +286,7 @@ function isAvailable(agent, workgroups) {
         !agent.onPhone,
         // The status must be 'Available'
         agent.statusName === 'Available',
-        // And at least on of _workgroups must be agent.workgroups
-        // hasWorkgroups(agent, workgroups),
-        /**
-         * If CSA is in workgroups and not Partner Service
-         * filter it out.
-         */
+        // Filter out any incorrect workgroups
         hasWorkgroupsSpecial(agent, workgroups),
     ]);
 }
@@ -285,7 +299,7 @@ function isAvailable(agent, workgroups) {
  * @return {Boolean}
  */
 function hasWorkgroups(agent, workgroups) {
-    var _agentWorkgroups= _.isArray(agent)
+    var _agentWorkgroups = _.isArray(agent)
         ? agent
         : agent.workgroups;
 
@@ -312,6 +326,11 @@ function hasWorkgroupsSpecial(agent, workgroups) {
         _workgroups[0] === 'CSA',
         hasWorkgroups(agent, ['Partner Service']),
     ];
+
+    // Sales finland isn't okey at all.
+    if (hasWorkgroups(agent, __disallowedWorkgroups)) {
+        return false;
+    }
 
     // Special rules for non Parter Service calls
     if (_.every(_cases)) {
@@ -394,7 +413,7 @@ function setupStorage() {
         _view.applyWhere(function (agent) {
             return _.every([
                 agent.isCurrent,
-                hasWorkgroups(agent, ['CSA', 'Partner Service']),
+                hasWorkgroups(agent, __acceptedWorkgroups),
             ]);
         }, 'filterTotal');
 
@@ -430,7 +449,7 @@ module.exports = {
         return Agents.where(function (item) {
             return _.every([
                 item.isCurrent,
-                hasWorkgroups(item, ['CSA', 'Partner Service']),
+                hasWorkgroupsSpecial(item, __acceptedWorkgroups),
             ]);
         }).map(function (item) { return _.omit(item, ['$loki', 'meta']); });
     },
