@@ -458,12 +458,10 @@ function getDateDiff(date1, date2, granularity, skipAbs) {
  * @return {Number}
  */
 function getGlobalTimeDiff() {
-    /**
-     * TODO:
-     * - figure out why the time diff keep getting smaller
-     */
     var _diffs = TimeDiffView
         .data()
+        .reduce(function (arr, item, i) { return arr.length < 10 ? arr.concat([item]) : arr; }, [])
+        .sort(compareQueueDiff)
         .map(function (item) { return item.localQueueTime - item.queueTime });
 
     if (!_.some(_diffs)) {
@@ -471,6 +469,19 @@ function getGlobalTimeDiff() {
     }
 
     return _.sum(_diffs) / _diffs.length;
+}
+
+/**
+ * @param {{ localQueueTime: Number, queueTime: Number }} a
+ * @param {{ localQueueTime: Number, queueTime: Number }} b
+ * @return {Number}
+ */
+function compareQueueDiff(a, b) {
+    var _a = a.localQueueTime - a.queueTime;
+    var _b = b.localQueueTime - b.queueTime;
+    return _a === _b
+        ? 0
+        : (_a < _b ? 1 : -1);
 }
 
 /**
@@ -806,13 +817,7 @@ function initTimeDiffView(view) {
         .applyWhere(function (item) { return moment().subtract(7, 'days').isBefore(item.startDate); })
         .applyWhere(function (item) { return !item.inQueue; })
         .applyWhere(function (item) { return _.every([item.localQueueTime, item.queueTime], _.isNumber); })
-        .applySort(function (a, b) {
-            var _a = a.localQueueTime - a.queueTime;
-            var _b = b.localQueueTime - b.queueTime;
-            return _a === _b
-                ? 0
-                : (_a < _b ? 1 : -1);
-        });
+        .applySimpleSort('$loki', true)
 }
 
 /**
