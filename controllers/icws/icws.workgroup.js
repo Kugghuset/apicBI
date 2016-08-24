@@ -661,17 +661,27 @@ function updateQueueInfo() {
  * @return {{ abandonDate: Number, abandonedLength: Number, completedDate: Number }}
  */
 function getDailyQueueData(workgroupName) {
-    var _abandoned = Interactions.where(function (item) {
+    var _total = Interactions.where(function (item) {
+        return _.every([
+            item.workgroup === workgroupName,
+            isParsableOrDate(item.endDate),
+            isToday(item),
+        ]);
+    });
+
+
+    var _abandoned = _total.filter(function (item) {
         return _.every([
             item.workgroup === workgroupName,
             item.isAbandoned,
             isToday(item),
         ]);
     });
-    var _total = Interactions.where(function (item) {
+
+    var _completed = _total.filter(function (item) {
         return _.every([
             item.workgroup === workgroupName,
-            // item.isCompleted,
+            item.isCompleted,
             isToday(item),
         ]);
     });
@@ -679,7 +689,8 @@ function getDailyQueueData(workgroupName) {
     return {
         abandonRate: ((_abandoned.length / (_total.length || 1)) * 100).toFixed(2),
         abandonedLength: _abandoned.length,
-        completedLength: _total.length,
+        completedLength: _completed.length,
+        totalLength: _total.length,
     }
 }
 
