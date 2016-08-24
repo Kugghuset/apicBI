@@ -10,10 +10,13 @@ var loki = require('lokijs');
 var icwsSub = require('./icws.sub');
 var icws = require('../../lib/icwsModule');
 var icwsStorage = require('./icws.storage');
+var icwsUtils = require('./icws.utils');
 
-/**
- * Remember to turn back time a minute on the dev laptop.
- */
+
+/*******************************
+ * TODO:
+ * - Clear data every day/week
+ *******************************/
 
 /**
  * @type {LokiCollection<{}>}
@@ -21,19 +24,9 @@ var icwsStorage = require('./icws.storage');
 var Interactions = icwsStorage.getCollection('interactions');
 
 /**
- * @type {LokiCollection<{}>}
+ * @type {LokiDynamicView<T>}
  */
-var WorkStations = icwsStorage.getCollection('workstations');
-
 var TimeDiffView = icwsStorage.getView(Interactions, 'timeDiffView', initTimeDiffView);
-
-/**
- * TODO:
- * - Clear data every day/week
- * - Smooth out queue time diff
- * - Store queue time diff in global variable instead of querying every time.
- * - Ensure updated queue time values are modified elsewhere too.
- */
 
 /**
  * The __types to watch changes for.
@@ -46,22 +39,21 @@ var _typeIds = {
     updateWorkstations: 'urn:inin.com:configuration.people:workgroupsMessage',
 };
 
+/**
+ * Enumeration of the various queueTypes
+ */
+var _queueTypes = {
+    system: 0,
+    user: 1,
+    workgroup: 2,
+    station: 3,
+}
+
 var __workstations = [];
 var __activeInteractions = [];
-var __finishedInteractions = [];
 
 /**
- * @type {{ id: String, abandonDate: Date }[]}
- */
-var __abandonedCalls = [];
-
-/**
- * @type {{ id: String, completedDate: Date }[]}
- */
-var __completedCalls = [];
-
-/**
- * The differance in milliseconds in comparison to the server.
+ * The differance in seconds in comparison to the server.
  *
  * @type {Number}
  */
@@ -119,10 +111,10 @@ function watch(dataArr) {
  */
 function updateInteractions(data) {
     // Get all added interactions
-    var _added = _.map(data.interactionsAdded, function (interaction) { return _.assign({}, getInteractionData(interaction), { referenceDate: new Date() }) });
+    var _added = _.map(data.interactionsAdded, function (interaction) { return _.assign({}, icwsUtils.icws.getInteractionData(interaction), { referenceDate: new Date() }) });
 
     // Get all changed interactions
-    var _changed = _.map(data.interactionsChanged, getInteractionData);
+    var _changed = _.map(data.interactionsChanged, icwsUtils.icws.getInteractionData);
 
     // Get all removed interactions
     // NOTE: This is a simple array of ids
@@ -133,8 +125,8 @@ function updateInteractions(data) {
         // Add them all
         __activeInteractions = __activeInteractions.concat(_.map(_added, function (interaction) {
             // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
-            if (canCalculateQueueTime(interaction)) {
-                interaction.queueTime = calculateQueueTime(interaction);
+            if (icwsUtils.canCalculateQueueTime(interaction)) {
+                interaction.queueTime = icwsUtils.calculateQueueTime(interaction);
             }
 
             return interaction;
@@ -144,8 +136,8 @@ function updateInteractions(data) {
          * Push or update persisted data.
          */
         _.forEach(_added, function (interaction) {
-            if (canCalculateQueueTime(interaction)) {
-                interaction.queueTime = calculateQueueTime(interaction);
+            if (icwsUtils.canCalculateQueueTime(interaction)) {
+                interaction.queueTime = icwsUtils.calculateQueueTime(interaction);
             }
 
             var _updated = Interactions.findOne({ id: _.toString(interaction.id) });
@@ -173,22 +165,12 @@ function updateInteractions(data) {
                 var _updated = _.assign({}, _interaction, interaction);
 
                 // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
-                if (canCalculateQueueTime(_updated)) {
-                    _updated.queueTime = calculateQueueTime(_updated);
+                if (icwsUtils.canCalculateQueueTime(_updated)) {
+                    _updated.queueTime = icwsUtils.calculateQueueTime(_updated);
                 }
 
                 // Splice in the updated version instead of the original item
                 __activeInteractions.splice(_index, 1, _updated);
-
-                // Add interaction to __abandonedCalls if the call is abandoned and not on the abandoned list
-                if (isAbandoned(_updated) && !_.find(__abandonedCalls, { id: _updated.id })) {
-                    __abandonedCalls.push({ id: _updated.id, abandonDate: new Date() });
-                }
-
-                // Add interaction to __completedCalls if the call is completed and not on the completed list
-                if (isCompleted(_updated) && !_.find(__completedCalls, { id: _updated.id })) {
-                    __completedCalls.push({ id: _updated.id, completedDate: new Date() });
-                }
             }
         });
 
@@ -199,23 +181,21 @@ function updateInteractions(data) {
             var _updated = Interactions.findOne({ id: _.toString(interaction.id) });
 
             if (_.isNull(_updated)) {
-                console.log('Failed to find interaction: ' + interaction.id);
+                console.log('Failed to find interaction to update: ' + interaction.id);
                 return;
             }
 
             // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
-            if (canCalculateQueueTime(_updated)) {
-                _updated.queueTime = calculateQueueTime(_updated);
+            if (icwsUtils.canCalculateQueueTime(_updated)) {
+                _updated.queueTime = icwsUtils.calculateQueueTime(_updated);
             }
 
-            if (isAbandoned(_updated) && !_updated.isAbandoned) {
-                // Set isAbandoned and abandonDate
+            if (icwsUtils.isAbandoned(_updated) && !_updated.isAbandoned) {
+                // Set isAbandoned
                 _updated.isAbandoned = true;
-                _updated.abandonDate = new Date();
-            } else if (isCompleted(_updated) && !_updated.isAbandoned) {
-                // Set isCompleted and completedDate
+            } else if (icwsUtils.isCompleted(_updated) && !_updated.isAbandoned) {
+                // Set isCompleted
                 _updated.isCompleted = true;
-                _updated.completedDate = new Date();
             }
 
             // Update the interaction
@@ -227,7 +207,6 @@ function updateInteractions(data) {
     // Handle removed interactions
     if (_.some(_removed)) {
         var _removedItems = _.remove(__activeInteractions, function (interaction) { return !!~_removed.indexOf(interaction.id); });
-        __finishedInteractions.concat(_removedItems);
 
         _.forEach(_removed, function (removedId) {
             var _updated = Interactions.findOne({ id: _.toString(removedId) });
@@ -298,168 +277,6 @@ function updateWorkstations(data) {
 }
 
 /**
- * Returns a more readable interaction object.
- *
- * @param {Object} interaction The interaction object returned from ININ
- * @return {{ id: String, type: String, callType: String, callDirection: String, remoteAddress: String, remoteId: String, remoteName: String, duration: Number, state: String, workgroup: String, userName: String, startDate: Date, endDate: Date, queueDate: Date, answerDate: Date, connectedDate: Date }}
- */
-function getInteractionData(interaction) {
-    return _.reduce({
-        id: _.get(interaction, 'interactionId'),
-        type: _.get(interaction, 'attributes.Eic_ObjectType'),
-        callType: getCallType(interaction),
-        callDirection: getCallDirection(interaction),
-        remoteAddress: _.get(interaction, 'attributes.Eic_RemoteAddress'),
-        remoteId: _.get(interaction, 'attributes.Eic_RemoteId'),
-        remoteName: _.get(interaction, 'attributes.Eic_RemoteName'),
-        duration: _.get(interaction, 'attributes.Eic_ConnectDurationTime'),
-        state: getState(interaction),
-        stateVal: _.get(interaction, 'attributes.Eic_State'),
-        workgroup: _.get(interaction, 'attributes.Eic_WorkgroupName'),
-        userName: _.get(interaction, 'attributes.Eic_UserName'),
-        startDate: getDate(interaction, 'Eic_InitiationTime'),
-        endDate: getDate(interaction, 'Eic_TerminationTime'),
-        queueDate: getDate(interaction, 'Eic_LineQueueTimestamp'),
-        answerDate: getDate(interaction, 'Eic_AnswerTime'),
-        connectedDate: getDate(interaction, 'Eic_ConnectTime'),
-        isCurrent: true,
-    }, function (obj, value, key) {
-        return !!value
-            ? _.assign({}, obj, _.set({}, key, value))
-            : obj;
-    }, {});
-}
-
-/**
- * Returns a string of the current state.
- *
- * @param {Object} interaction The interaction object returned from ININ
- * @return {String} The state as a readable string instead of a single character
- */
-function getState(interaction) {
-    var _state;
-
-    if (_.get(interaction, 'attributes.Eic_State') === 'A') {
-        _state = 'Alerting agent'
-    } else if (_.get(interaction, 'attributes.Eic_State') === 'C') {
-        _state = 'On call';
-    } else if (_.get(interaction, 'attributes.Eic_State') === 'H') {
-        _state = 'On hold'
-    } else if (_.get(interaction, 'attributes.Eic_State') === 'M') {
-        _state = 'Voicemail';
-    } else if (_.get(interaction, 'attributes.Eic_State') === 'O') {
-        _state = 'Offering';
-    } else if (_.get(interaction, 'attributes.Eic_State') === 'R') {
-        _state = 'Awaiting answer';
-    } else if (_.get(interaction, 'attributes.Eic_State') === 'P') {
-        _state = 'Parked';
-    } else if (_.get(interaction, 'attributes.Eic_State') === 'E') {
-        _state = 'Call ended remotely';
-    } else if (_.get(interaction, 'attributes.Eic_State') === 'I') {
-        _state = 'Call ended locally';
-    } else if (_.get(interaction, 'attributes.Eic_State') === 'S') {
-        _state = 'Dialing';
-    } else {
-        _state = undefined;
-    }
-
-    return _state;
-}
-
-/**
- * @param {Object} interaction The interaction object returned from ININ
- * @return {String} The call type as a readable string.
- */
-function getCallType(interaction) {
-    var callType = _.get(interaction, 'attributes.Eic_CallType');// === 'E' ? 'external' : 'intercom',
-
-    if (callType === 'E') {
-        return 'external';
-    } else if (callType === 'I') {
-        return 'intercom';
-    } else {
-        return undefined;
-    }
-}
-
-/**
- * @param {Object} interaction The interaction object returned from ININ
- * @return {String} The call direction as a readable string.
- */
-function getCallDirection(interaction) {
-    var callDirection = _.get(interaction, 'attributes.Eic_CallDirection');
-
-    if (callDirection === 'I') {
-        return 'inbound';
-    } else if (callDirection === 'O') {
-        return 'outbound';
-    } else {
-        return undefined;
-    }
-}
-
-/**
- * @param {Object} interaction The interaction object returned
- * @param {String} dateType The type of date to return
- * @return {Date}
- */
-function getDate(interaction, dateType) {
-    var _dateString = _.get(interaction, 'attributes.' + dateType);
-
-    // If there is no value, return null.
-    if (!_dateString) {
-        return null;
-    }
-
-    var _date;
-
-    if (moment(new Date(_dateString)).isValid()) {
-        _date = new Date(_dateString);
-    } else if (moment(_dateString).isValid()) {
-        _date = moment(_dateString).toDate();
-    } else {
-        _date = _dateString;
-    }
-
-    return _date;
-}
-
-/**
- * Calculates the queue time, until the call is connected (if answered) or ended (abandoned)
- * and returns it in seconds.
- *
- * @param {{ endDate: Date, connectedDate: Date, queueDate: Date, state: String }} interaction
- * @return {Number}
- */
-function calculateQueueTime(interaction) {
-    var _lastDate = isAbandoned(interaction)
-        ? interaction.endDate
-        : interaction.connectedDate;
-
-    return getDateDiff(interaction.queueDate, _lastDate, 'seconds');
-}
-
-/**
- * @param {Object} interaction The interaction object to get values from
- * @param {String} dateType1
- * @param {String} dateType2
- * @return {Number}
- */
-function getDateDiff(date1, date2, granularity, skipAbs) {
-    skipAbs = _.isBoolean(skipAbs) ? skipAbs : false;
-
-    granularity = !!granularity ? granularity : 'seconds';
-
-    if (!date2) {
-        return -1;
-    }
-
-    return skipAbs
-        ? moment(date1).diff(date2, granularity)
-        : Math.abs(moment(date1).diff(date2, granularity));
-}
-
-/**
  * @param {String} granularity
  * @return {Number}
  */
@@ -467,7 +284,7 @@ function getGlobalTimeDiff() {
     var _diffs = TimeDiffView
         .data()
         .reduce(function (arr, item, i) { return arr.length < 10 ? arr.concat([item]) : arr; }, [])
-        .sort(compareQueueDiff)
+        .sort(icwsUtils.compareQueueDiff)
         .map(function (item) { return item.localQueueTime - item.queueTime });
 
     if (!_.some(_diffs)) {
@@ -475,19 +292,6 @@ function getGlobalTimeDiff() {
     }
 
     return _.sum(_diffs) / _diffs.length;
-}
-
-/**
- * @param {{ localQueueTime: Number, queueTime: Number }} a
- * @param {{ localQueueTime: Number, queueTime: Number }} b
- * @return {Number}
- */
-function compareQueueDiff(a, b) {
-    var _a = a.localQueueTime - a.queueTime;
-    var _b = b.localQueueTime - b.queueTime;
-    return _a === _b
-        ? 0
-        : (_a < _b ? 1 : -1);
 }
 
 /**
@@ -507,24 +311,8 @@ function updateCalculatedValues(interaction, index) {
     // Get the persisted interaction
     var _storedInteraction = Interactions.findOne({ id: _.toString(interaction.id) });
 
-    // Update the inQueue property
-    if (isInQueue(interaction) && !interaction.inQueue) {
-        interaction.inQueue = true;
-    } else if (!isInQueue(interaction) && interaction.inQueue) {
-        interaction.inQueue = false;
-    }
-
-    if (isAbandoned(interaction) && !interaction.isAbandoned) {
-        interaction.isAbandoned = true;
-    } else if (!isAbandoned(interaction) && interaction.isAbandoned) {
-        interaction.isAbandoned = false;
-    }
-
-    if (isCompleted(interaction) && !interaction.isCompleted) {
-        interaction.isCompleted = true;
-    } else if (!isCompleted(interaction) && interaction.isCompleted) {
-        interaction.isCompleted = false;
-    }
+    // Set inQueue, isAbandoned, isCompleted
+    interaction = icwsUtils.updateQueueState(interaction);
 
     // Set correctedQueueTime to either the time diff returned form getInteractionQueueTime or the actual queueTime.
     if (interaction.inQueue) {
@@ -550,77 +338,6 @@ function updateCalculatedValues(interaction, index) {
         _storedInteraction = _.assign(_storedInteraction, _updated);
         Interactions.update(_storedInteraction);
     }
-}
-
-/**
- * Returns a boolean value of whether the *_date* can be a date or not.
- *
- * @param {Any} _date
- * @return {Boolean}
- */
-function isParsableOrDate(_date) {
-    return !_date ? false : moment(new Date(_date)).isValid();
-}
-
-/**
- * @param {Object} interaction The interaction object to get values from
- * @return {Boolean} Whether the *interaction* is assumed to be in queue or not.
- */
-function isInQueue(interaction) {
-    return !_.some([
-        !_.isUndefined(interaction.queueTime),
-        isParsableOrDate(interaction.endDate),
-        interaction.callDirection !== 'inbound',
-    ]);
-}
-
-/**
- * @param {Object} interaction The interaction object to get values from
- * @return {Boolean} Whether the *interaction* has queueTime or not.
- */
-function canCalculateQueueTime(interaction) {
-    return _.every([
-        _.isUndefined(interaction.queueTime),
-        !_.isUndefined(interaction.queueDate),
-        _.some([interaction.connectedDate, interaction.endDate], isParsableOrDate),
-    ]);
-}
-
-/**
- * @param {Object} interaction The interaction object to get values from
- * @return {Boolean} Whether the *interaction* is assumed to be completed or not.
- */
-function isAbandoned(interaction) {
-    return _.every([
-        isParsableOrDate(interaction.endDate),
-        !isParsableOrDate(interaction.connectedDate),
-        interaction.state === 'Call ended remotely',
-    ]);
-}
-
-/**
- * @param {Object} interaction The interaction object to get values from
- * @return {Boolean} Whether the *interaction* is assumed to be completed or not.
- */
-function isCompleted(interaction) {
-    return _.every([
-        isParsableOrDate(interaction.endDate),
-        isParsableOrDate(interaction.connectedDate),
-        interaction.state !== 'On call',
-    ]);
-}
-
-/**
- * @param {{ startDate: Date }} item
- * @return {Boolean}
- */
-function isToday(item) {
-    return !item
-        ? false
-        : moment(item.startDate).isBetween(
-            moment().startOf('day'),
-            moment().endOf('day')
-        );
 }
 
 /**
@@ -658,23 +375,22 @@ function updateQueueInfo() {
 /**
  *
  * @param {String} workgroupName
- * @return {{ abandonDate: Number, abandonedLength: Number, completedDate: Number }}
+ * @return {{ abandonRate: Number, abandonedLength: Number, completedLength: Number, totalLength: Number }}
  */
 function getDailyQueueData(workgroupName) {
     var _total = Interactions.where(function (item) {
         return _.every([
             item.workgroup === workgroupName,
-            isParsableOrDate(item.endDate),
-            isToday(item),
+            icwsUtils.isParsableOrDate(item.endDate),
+            icwsUtils.isToday(item),
         ]);
     });
-
 
     var _abandoned = _total.filter(function (item) {
         return _.every([
             item.workgroup === workgroupName,
             item.isAbandoned,
-            isToday(item),
+            icwsUtils.isToday(item),
         ]);
     });
 
@@ -682,7 +398,7 @@ function getDailyQueueData(workgroupName) {
         return _.every([
             item.workgroup === workgroupName,
             item.isCompleted,
-            isToday(item),
+            icwsUtils.isToday(item),
         ]);
     });
 
@@ -696,8 +412,8 @@ function getDailyQueueData(workgroupName) {
 
 /**
  *
- * @param {Object} interaction The interaction object to get values from
- * @param {Boolean} [useGlobalTimeDiff = false]
+ * @param {{ queueDate: Date }} interaction The interaction object to get values from
+ * @param {Boolean} [useGlobalTimeDiff=false] Defaults to false
  * @return {Number}
  */
 function getInteractionQueueTime(interaction, useGlobalTimeDiff) {
@@ -723,7 +439,7 @@ function getInteractionQueueTime(interaction, useGlobalTimeDiff) {
  * with the subscription id *subId*.
  *
  * @param {String} action The action to run
- * @param {Number} subId Defaults to 1
+ * @param {String} subId Defaults to 'kugghuset-1'
  * @return {Promise}
  */
 function workStationSub(action, subId) {
@@ -751,16 +467,6 @@ function workStationSub(action, subId) {
             ],
             rightsFilter: 'view'
         });
-}
-
-/**
- * Enumeration of the various queueTypes
- */
-var _queueTypes = {
-    system: 0,
-    user: 1,
-    workgroup: 2,
-    station: 3,
 }
 
 /**
@@ -824,6 +530,10 @@ function queueSub(action, subId, workstations) {
 }
 
 /**
+ * Initializes the TimeDiffView with items only from the last week,
+ * items not in queue and where there is a localQueueTime and queueTime
+ * and sorts them in reverse as to their natural order (by '$loki', Loki's ID).
+ *
  * @param {LokiDynamicView<T>} view
  * @return {LokiDynamicView<T>}
  */
@@ -840,18 +550,11 @@ function initTimeDiffView(view) {
  */
 function setupStorage() {
     Interactions = icwsStorage.getCollection('interactions');
-    WorkStations = icwsStorage.getCollection('workstations');
     TimeDiffView = icwsStorage.getView(Interactions, 'timeDiffView', initTimeDiffView);
 
     // Update all values
     Interactions.findAndUpdate(function () { return true; }, function (item) {
-        return _.assign(item, {
-            isCurrent: false,
-            inQueue: isInQueue(item),
-            isAbandoned: isAbandoned(item),
-            isCompleted: isCompleted(item),
-            // localQueueTime: null,
-        });
+        return _.assign(item, icwsUtils.updateQueueState(item), { isCurrent: false });
     });
 }
 
@@ -874,7 +577,6 @@ function setup(subId) {
     return workStationSub('subscribe', subId);
 }
 
-
 module.exports = {
     watch: watch,
     setup: setup,
@@ -884,7 +586,6 @@ module.exports = {
             _activeInteractions: Interactions.where(function (item) { return item.isCurrent; }),
             csaInteractions: Interactions.where(function (item) { return item.workgroup === 'CSA', item.isCurrent }),
             partnerServiceInteractions: Interactions.where(function (item) { return item.workgroup === 'Partner Service', item.isCurrent }),
-            finishedInteractions: __finishedInteractions,
         }
     },
     getQueueInfo: function () {

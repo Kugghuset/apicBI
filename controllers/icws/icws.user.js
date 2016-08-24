@@ -321,12 +321,6 @@ function hasWorkgroupsSpecial(agent, workgroups) {
     return hasWorkgroups(agent, _workgroups);
 }
 
-/**
- * @return {}
- */
-function getUserInfo() {
-
-}
 
 /*****************
  * Subscriptions

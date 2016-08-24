@@ -7,7 +7,7 @@ var icws = require('../lib/icwsModule');
 var _interval;
 
 var icwsUser = require('./icws/icws.user');
-var icwsWorkgroup = require('./icws/icws.workgroup');
+var icwsInteraction = require('./icws/icws.interaction');
 var icwsStorage = require('./icws/icws.storage');
 
 /**
@@ -26,7 +26,7 @@ function poll() {
 
         // Watch for, and handles changes regarding users
         icwsUser.watch(dataArr);
-        icwsWorkgroup.watch(dataArr);
+        icwsInteraction.watch(dataArr);
     })
     .catch(function (err) {
         console.log('The following error occured when polling: ' + err.toString());
@@ -48,7 +48,7 @@ function poll() {
 function setupSubscriptions() {
     return new Promise(function (resolve, reject) {
 
-        var promises = [ icwsUser.setup(), icwsWorkgroup.setup() ];
+        var promises = [ icwsUser.setup(), icwsInteraction.setup() ];
 
         Promise.all(_.map(promises, function (promise) { return promise.reflect(); }))
         .then(function (data) {
@@ -162,7 +162,7 @@ module.exports = {
     stopPolling: stopPolling,
     run: run,
     getUsers: icwsUser.getUsers,
-    getInteractions: icwsWorkgroup.getInteractions,
+    getInteractions: icwsInteraction.getInteractions,
     getUserInfo: icwsUser.getUserInfo,
-    getQueueInfo: icwsWorkgroup.getQueueInfo,
+    getQueueInfo: icwsInteraction.getQueueInfo,
 };
