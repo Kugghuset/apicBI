@@ -661,8 +661,6 @@ function updateQueueInfo() {
  * @return {{ abandonDate: Number, abandonedLength: Number, completedDate: Number }}
  */
 function getDailyQueueData(workgroupName) {
-    var _startdate = { $gte: moment().startOf('day').toDate(), $lte: moment().endOf('day').toDate(), };
-
     var _abandoned = Interactions.where(function (item) {
         return _.every([
             item.workgroup === workgroupName,
@@ -670,18 +668,18 @@ function getDailyQueueData(workgroupName) {
             isToday(item),
         ]);
     });
-    var _completed = Interactions.where(function (item) {
+    var _total = Interactions.where(function (item) {
         return _.every([
             item.workgroup === workgroupName,
-            item.isCompleted,
+            // item.isCompleted,
             isToday(item),
         ]);
     });
 
     return {
-        abandonRate: ((_abandoned.length / (_completed.length || 1)) * 100).toFixed(2),
+        abandonRate: ((_abandoned.length / (_total.length || 1)) * 100).toFixed(2),
         abandonedLength: _abandoned.length,
-        completedLength: _completed.length,
+        completedLength: _total.length,
     }
 }
 
