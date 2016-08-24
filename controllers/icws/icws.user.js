@@ -306,15 +306,16 @@ function hasWorkgroupsSpecial(agent, workgroups) {
         ? workgroups
         : [ workgroups ];
 
-    var _isCSA = _.every([
-        !!_.find(_workgroups, 'CSA'),
-        !_.find(_workgroups, 'Partner Service'),
-        hasWorkgroups(agent, 'CSA'),
-        !hasWorkgroups(agent, 'Partner Service'),
-    ])
+    // When there's a single workgroup and it is 'CSA', agents in 'Partner Service' are not in 'CSA'.
+    var _cases = [
+        _workgroups.length === 1,
+        _workgroups[0] === 'CSA',
+        hasWorkgroups(agent, ['Partner Service']),
+    ];
+
     // Special rules for non Parter Service calls
-    if (_isCSA) {
-        return true;
+    if (_.every(_cases)) {
+        return false;
     }
 
     return hasWorkgroups(agent, _workgroups);
