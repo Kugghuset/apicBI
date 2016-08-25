@@ -12,21 +12,17 @@ var icws = require('../../lib/icwsModule');
 var icwsStorage = require('./icws.storage');
 var icwsUtils = require('./icws.utils');
 
-
-/*******************************
- * TODO:
- * - Clear data every day/week
- *******************************/
-
-/**
- * @type {LokiCollection<{}>}
- */
+/** @type {LokiCollection<{}>} */
 var Interactions = icwsStorage.getCollection('interactions');
 
-/**
- * @type {LokiDynamicView<T>}
- */
+/** @type {LokiDynamicView<T>} */
 var TimeDiffView = icwsStorage.getView(Interactions, 'timeDiffView', initTimeDiffView);
+
+/** @type {LokiDynamicView<T>} */
+var DailyInteractionView = icwsStorage.getView(Interactions, 'dailyInteractionView', initDailyInteractionView)
+
+/** @type {LokiDynamicView<T>} */
+var WeeklyInteractionView = icwsStorage.getView(Interactions, 'weeklyInteractionView', initWeeklyInteractionView)
 
 /**
  * The __types to watch changes for.
@@ -342,9 +338,10 @@ function updateCalculatedValues(interaction, index) {
 
 /**
  * @param {String} workgroupName
+ * @param {String} span
  * @return {{ queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number })
  */
-function getQueueInfoData(workgroupName) {
+function getQueueInfoData(workgroupName, span) {
     return _.chain(Interactions.where(function (item) { return _.every([
         item.isCurrent,
         item.workgroup === workgroupName,
@@ -359,48 +356,49 @@ function getQueueInfoData(workgroupName) {
             ? { id: null, queueTime: 0, queueLength: 0 }
             : { id: interaction.id, queueTime: interaction.correctedQueueTime, queueLength: interaction.queueLength }
         })
-        .thru(function (queueInfo) { return _.assign({}, queueInfo, getDailyQueueData(workgroupName)); })
+        .thru(function (queueInfo) { return _.assign({}, queueInfo, getQueueData(workgroupName, span)); })
         .value();
 }
 
 /**
  * Updates the longest queue time and ID.
- * @reuturn {{ csa: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }, partnerService: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number } }}
+ * @reuturn {{ daily: csa: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }, partnerService: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }, weekly: csa: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }, partnerService: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number } }}
  */
 function updateQueueInfo() {
-    __queueInfo = { csa: getQueueInfoData('CSA'), partnerService: getQueueInfoData('Partner Service'), timeDiff: __localTimeDiff };
+    __queueInfo = {
+        daily: {
+            csa: getQueueInfoData('CSA', 'daily'),
+            partnerService: getQueueInfoData('Partner Service', 'daily'),
+        },
+        weekly: {
+            csa: getQueueInfoData('CSA', 'weekly'),
+            partnerService: getQueueInfoData('Partner Service', 'weekly'),
+        },
+        timeDiff: __localTimeDiff
+    };
     return __queueInfo;
 }
 
 /**
- *
  * @param {String} workgroupName
+ * @param {String} span
  * @return {{ abandonRate: Number, abandonedLength: Number, completedLength: Number, totalLength: Number }}
  */
-function getDailyQueueData(workgroupName) {
-    var _total = Interactions.where(function (item) {
-        return _.every([
-            item.workgroup === workgroupName,
-            icwsUtils.isParsableOrDate(item.endDate),
-            icwsUtils.isToday(item),
-        ]);
-    });
+function getQueueData(workgroupName, span) {
+    // Get all either abandoned or completed items, either from today or this week.
+    var _total = (
+        span === 'daily'
+            ? DailyInteractionView
+            : WeeklyInteractionView
+        )
+        .data()
+        .filter(function (interaction) { return interaction.workgroup === workgroupName; });
 
-    var _abandoned = _total.filter(function (item) {
-        return _.every([
-            item.workgroup === workgroupName,
-            item.isAbandoned,
-            icwsUtils.isToday(item),
-        ]);
-    });
+    // Get only the abandoned items
+    var _abandoned = _total.filter(function (item) { return item.isAbandoned; });
 
-    var _completed = _total.filter(function (item) {
-        return _.every([
-            item.workgroup === workgroupName,
-            item.isCompleted,
-            icwsUtils.isToday(item),
-        ]);
-    });
+    // Get the completed items
+    var _completed = _total.filter(function (item) { return item.isCompleted; });
 
     return {
         abandonRate: ((_abandoned.length / (_total.length || 1)) * 100).toFixed(2),
@@ -546,11 +544,43 @@ function initTimeDiffView(view) {
 }
 
 /**
+ * @param {LokiDynamicView<T>} view
+ * @return {LokiDynamicView<T>}
+ */
+function initDailyInteractionView(view) {
+    return view
+        .applyWhere(function (item) {
+            return _.every([
+                icwsUtils.contains(['Partner Service', 'CSA'], item.workgroup),
+                icwsUtils.isParsableOrDate(item.endDate),
+                icwsUtils.isToday(item),
+            ]);
+        });
+}
+
+/**
+ * @param {LokiDynamicView<T>} view
+ * @return {LokiDynamicView<T>}
+ */
+function initWeeklyInteractionView(view) {
+    return view
+        .applyWhere(function (item) {
+            return _.every([
+                icwsUtils.contains(['Partner Service', 'CSA'], item.workgroup),
+                icwsUtils.isParsableOrDate(item.endDate),
+                icwsUtils.isThisWeek(item),
+            ]);
+        });
+}
+
+/**
  * Sets up the stored data.
  */
 function setupStorage() {
     Interactions = icwsStorage.getCollection('interactions');
     TimeDiffView = icwsStorage.getView(Interactions, 'timeDiffView', initTimeDiffView);
+    DailyInteractionView = icwsStorage.getView(Interactions, 'dailyInteractionView', initDailyInteractionView)
+    WeeklyInteractionView = icwsStorage.getView(Interactions, 'weeklyInteractionView', initWeeklyInteractionView)
 
     // Update all values
     Interactions.findAndUpdate(function () { return true; }, function (item) {

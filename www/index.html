@@ -79,13 +79,40 @@
       <tbody>
         <tr v-for="workgroup in ['csa', 'partnerService']">
           <td>{{ workgroup === 'csa' ? 'CSA' : 'Partner Service' }}</td>
-          <td>{{ queueInfo[workgroup].queueLength }}</td>
-          <td>{{ formatTimer(queueInfo[workgroup].queueTime) }}</td>
+          <td>{{ queueInfo.daily[workgroup].queueLength }}</td>
+          <td>{{ formatTimer(queueInfo.daily[workgroup].queueTime) }}</td>
           <td>{{ userInfo[workgroup].availableAgentCount }}</td>
-          <td>{{ queueInfo[workgroup].totalLength }}</td>
-          <td>{{ queueInfo[workgroup].completedLength }}</td>
-          <td>{{ queueInfo[workgroup].abandonedLength }}</td>
-          <td>{{ queueInfo[workgroup].abandonRate + ' %' }}</td>
+          <td>{{ queueInfo.daily[workgroup].totalLength }}</td>
+          <td>{{ queueInfo.daily[workgroup].completedLength }}</td>
+          <td>{{ queueInfo.daily[workgroup].abandonedLength }}</td>
+          <td>{{ queueInfo.daily[workgroup].abandonRate + ' %' }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h1>Weekly queue info</h1>
+
+    <table>
+      <thead>
+        <th>Workgroup</th>
+        <th>Queue length</th>
+        <th>Queue time</th>
+        <th>Available agents</th>
+        <th>Total calls</th>
+        <th>Completed calls</th>
+        <th>Abandoned calls</th>
+        <th>Abandon rate</th>
+      </thead>
+      <tbody>
+        <tr v-for="workgroup in ['csa', 'partnerService']">
+          <td>{{ workgroup === 'csa' ? 'CSA' : 'Partner Service' }}</td>
+          <td>{{ queueInfo.weekly[workgroup].queueLength }}</td>
+          <td>{{ formatTimer(queueInfo.weekly[workgroup].queueTime) }}</td>
+          <td>{{ userInfo[workgroup].availableAgentCount }}</td>
+          <td>{{ queueInfo.weekly[workgroup].totalLength }}</td>
+          <td>{{ queueInfo.weekly[workgroup].completedLength }}</td>
+          <td>{{ queueInfo.weekly[workgroup].abandonedLength }}</td>
+          <td>{{ queueInfo.weekly[workgroup].abandonRate + ' %' }}</td>
         </tr>
       </tbody>
     </table>

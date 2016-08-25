@@ -278,6 +278,16 @@ function getInteractionData(interaction) {
             : obj;
     }, {});
 }
+
+/**
+ * @param {Array} coll Collection to check *match* against
+ * @param {Any} match Item or items to look for in *coll*
+ * @return {Boolean}
+ */
+function contains(coll, match) {
+  return !!~_.indexOf(coll, match);
+}
+
 module.exports = {
     isParsableOrDate: isParsableOrDate,
     canCalculateQueueTime: canCalculateQueueTime,
@@ -296,5 +306,6 @@ module.exports = {
         getCallType: getCallType,
         getCallDirection: getCallDirection,
         getInteractionData: getInteractionData,
-    }
+    },
+    contains: contains,
 }
