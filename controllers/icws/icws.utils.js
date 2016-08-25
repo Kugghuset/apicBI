@@ -80,6 +80,12 @@ function isToday(interaction) {
         );
 }
 
+/**
+ * Checks whether *item* was started today and returns true or false for it.
+ *
+ * @param {{ startDate: Date }} interaction
+ * @return {Boolean}
+ */
 function isThisWeek(interaction) {
     return !interaction
         ? false

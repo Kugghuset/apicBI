@@ -16,15 +16,6 @@ var icwsData = require('./icws.data');
 /** @type {LokiCollection<{}>} */
 var Interactions = icwsStorage.getCollection('interactions');
 
-/** @type {LokiDynamicView<T>} */
-var TimeDiffView = icwsStorage.getView(Interactions, 'timeDiffView', initTimeDiffView);
-
-/** @type {LokiDynamicView<T>} */
-var DailyInteractionView = icwsStorage.getView(Interactions, 'dailyInteractionView', initDailyInteractionView)
-
-/** @type {LokiDynamicView<T>} */
-var WeeklyInteractionView = icwsStorage.getView(Interactions, 'weeklyInteractionView', initWeeklyInteractionView)
-
 /**
  * The __types to watch changes for.
  *

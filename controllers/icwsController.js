@@ -163,8 +163,8 @@ function run() {
 module.exports = {
     stopPolling: stopPolling,
     run: run,
-    getUsers: icwsUser.getUsers,
+    getUsers: icwsData.getAgents,
     getInteractions: icwsData.getInteractions,
-    getUserInfo: icwsUser.getUserInfo,
+    getUserStats: icwsData.getAgentStats,
     getQueueStats: icwsData.getQueueStats,
 };

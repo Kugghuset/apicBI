@@ -19,7 +19,7 @@ var router = new express.Router();
 
 router.get('/api/resources', function (req, res) {
   var users = icwsCtrl.getUsers();
-  var userInfo = icwsCtrl.getUserInfo();
+  var userInfo = icwsCtrl.getUserStats();
   var interactions = icwsCtrl.getInteractions();
   var queueInfo = icwsCtrl.getQueueStats();
 

@@ -5,12 +5,10 @@ var Promise = require('bluebird');
 
 var icwsSub = require('./icws.sub');
 var icwsStorage = require('./icws.storage');
-
+var icwsData = require('./icws.data');
 
 /** @type {LokiCollection<T>} */
 var Agents = icwsStorage.getCollection('agents');
-/** @type {LokiDynamicView<T>} */
-var AgentsInfoView = icwsStorage.getView(Agents, 'agentInfo', _.noop);
 
 /**
  * The __types to watch changes for.
@@ -22,34 +20,6 @@ var __typeIds = {
     updateUsers: 'urn:inin.com:configuration.people:usersMessage',
     updateStatuses: 'urn:inin.com:status:userStatusMessage',
 }
-
-/**
- * Array of accepted workgroups.
- *
- * @type {String[]}
- */
-var __acceptedWorkgroups = [
-    'CSA',
-    'Partner Service',
-    // 'ZendeskTest', // possibly
-];
-
-/**
- * Array of not accepted workgroups.
- *
- * @type {String[]}
- */
-var __disallowedWorkgroups = [
-];
-
-/**
- * Data regarding agent availability.
- */
-var __userInfo = {
-    csa: { agentCount: 0, availableAgentCount: 0 },
-    partnerService: { agentCount: 0, availableAgentCount: 0 },
-    total: { agentCount: 0, availableAgentCount: 0 },
-};
 
 // The complete list of users
 var _users = [];
@@ -168,38 +138,8 @@ function updateUsers(data) {
             userStatusSub('unsubscribe', _removed);
         }
 
-        updateUserInfo();
+        icwsData.updateAgentInfo();
     }
-}
-
-/**
- * Updates the current user info (availability).
- */
-function updateUserInfo() {
-    __userInfo = {
-        csa: getAgentInfo(['CSA']),
-        partnerService: getAgentInfo(['Partner Service']),
-        total: getAgentInfo(__acceptedWorkgroups),
-    };
-}
-
-/**
- *
- * @param {String[]|String} workgroups
- * @return {{ agentCount: Number, availableAgentCount: Number }}
- */
-function getAgentInfo(workgroups) {
-    var _agents = Agents.where(function (agent) {
-        return _.every([
-            agent.isCurrent,
-            hasWorkgroupsSpecial(agent, workgroups),
-        ]);
-    });
-
-    return {
-        agentCount: _agents.length,
-        availableAgentCount: _.filter(_agents, function (agent) { return isAvailable(agent, workgroups); }).length,
-    };
 }
 
 /**
@@ -252,7 +192,7 @@ function updateStatuses(data) {
 
     // If there are any updated statuses, update the user info.
     if (_.some(_statUsers)) {
-        updateUserInfo();
+        icwsData.updateAgentInfo();
     }
 }
 
@@ -260,89 +200,19 @@ function updateStatuses(data) {
  * Returns true or false for whether the agent is considered available or not.
  *
  * @param {{ loggedIn: Boolean, onPhone: Boolean, statusName: String, workgroups: { name: String }[] }} agent
- * @return {Boolean}
+ * @return {{ loggedIn: Boolean, onPhone: Boolean, statusName: String, workgroups: { name: String }[], isAvailable: Boolean, isAvailableCsa: Boolean, isAvailablePartnerService: Boolean }}
  */
 function getAvailability(agent) {
     return _.assign({}, agent, {
-        isAvailableCsa: isAvailable(agent, ['CSA']),
-        isAvailablePartnerService: isAvailable(agent, ['Partner Service']),
-        isAvailable: isAvailable(agent, __acceptedWorkgroups),
+        isAvailableCsa: icwsData.agentIsAvailable(agent, ['CSA']),
+        isAvailablePartnerService: icwsData.agentIsAvailable(agent, ['Partner Service']),
+        isAvailable: icwsData.agentIsAvailable(agent, icwsData.getAllowedWorkgroups()),
     });
 }
 
-/**
- * Returns true or false for whether the agent is considered available or not.
- *
- * @param {{ loggedIn: Boolean, onPhone: Boolean, statusName: String, workgroups: { name: String }[] }} agent
- * @param {String[]|String} workgroups
- * @return {Boolean}
- */
-function isAvailable(agent, workgroups) {
-    return _.every([
-        // Must be logged in
-        agent.loggedIn,
-        // Must not be on the phone
-        !agent.onPhone,
-        // The status must be 'Available'
-        agent.statusName === 'Available',
-        // Filter out any incorrect workgroups
-        hasWorkgroupsSpecial(agent, workgroups),
-    ]);
-}
-
-/**
- * Returns true or false for whether *agent* contains any *workgroups*.
- *
- * @param {{ workgroups: { name: String }[] } | { name: String }[]} agent
- * @param {String[]|String} workgroups
- * @return {Boolean}
- */
-function hasWorkgroups(agent, workgroups) {
-    var _agentWorkgroups = _.isArray(agent)
-        ? agent
-        : agent.workgroups;
-
-    var _workgroups = _.isArray(workgroups)
-        ? workgroups
-        : [ workgroups ];
-
-    return _.some(_workgroups, function (wg) { return !!_.find(_agentWorkgroups, { name: wg }) });
-}
-
-/**
- * @param {{ loggedIn: Boolean, onPhone: Boolean, statusName: String, workgroups: { name: String }[] }} agent
- * @param {String[]|String} workgroups
- * @return {Boolean}
- */
-function hasWorkgroupsSpecial(agent, workgroups) {
-    var _workgroups = _.isArray(workgroups)
-        ? workgroups
-        : [ workgroups ];
-
-    // When there's a single workgroup and it is 'CSA', agents in 'Partner Service' are not in 'CSA'.
-    var _cases = [
-        _workgroups.length === 1,
-        _workgroups[0] === 'CSA',
-        hasWorkgroups(agent, ['Partner Service']),
-    ];
-
-    // Sales finland isn't okey at all.
-    if (hasWorkgroups(agent, __disallowedWorkgroups)) {
-        return false;
-    }
-
-    // Special rules for non Parter Service calls
-    if (_.every(_cases)) {
-        return false;
-    }
-
-    return hasWorkgroups(agent, _workgroups);
-}
-
-
-/*****************
- * Subscriptions
- *****************/
+/*********************
+ * ICWS subscriptions
+ *********************/
 
 /**
  * Subscribes or unsubscribes to updates to the user list.
@@ -401,30 +271,6 @@ function userStatusSub(action, users) {
 }
 
 /**
- * Sets up the stored agents.
- */
-function setupStorage() {
-    Agents = icwsStorage.getCollection('agents');
-    AgentsInfoView = icwsStorage.getView(Agents, 'agentInfo', function (view) {
-        /** @type {LokiDynamicView<T>} */
-        var _view = view;
-
-        _view.applyWhere(function (agent) {
-            return _.every([
-                agent.isCurrent,
-                hasWorkgroups(agent, __acceptedWorkgroups),
-            ]);
-        }, 'filterTotal');
-
-        return _view;
-    });
-
-    Agents.findAndUpdate(function () { return true; }, function (agent) {
-        return _.assign(item, { isCurrent: false, });
-    });
-}
-
-/**
  * Sets the user subscriptions up.
  *
  * @param {String} subId Subscription ID string, defaults to 'kugghuset-1'
@@ -436,7 +282,7 @@ function setup(subId) {
         ? subId
         : 'kugghuset-1';
 
-    setupStorage();
+    Agents = icwsStorage.getCollection('agents');
 
     return userListSub('subscribe', subId);
 }
@@ -444,15 +290,4 @@ function setup(subId) {
 module.exports = {
     watch: watch,
     setup: setup,
-    getUsers: function () {
-        return Agents.where(function (item) {
-            return _.every([
-                item.isCurrent,
-                hasWorkgroupsSpecial(item, __acceptedWorkgroups),
-            ]);
-        }).map(function (item) { return _.omit(item, ['$loki', 'meta']); });
-    },
-    getUserInfo: function () {
-        return __userInfo;
-    },
 }

@@ -12,6 +12,9 @@ var icwsUtils = require('./icws.utils');
 
 /** @type {LokiCollection<{}>} */
 var Interactions = icwsStorage.getCollection('interactions');
+/** @type {LokiCollection<T>} */
+var Agents = icwsStorage.getCollection('agents');
+
 
 /** @type {LokiDynamicView<T>} */
 var TimeDiffView = icwsStorage.getView(Interactions, 'timeDiffView', initTimeDiffView);
@@ -26,7 +29,28 @@ var DailyInteractionView = icwsStorage.getView(Interactions, 'dailyInteractionVi
 var WeeklyInteractionView = icwsStorage.getView(Interactions, 'weeklyInteractionView', initWeeklyInteractionView)
 
 /** @type {LokiDynamicView<T>} */
-var CurrentInteractionView = icwsStorage.getView(Interactions, 'currentInteractionView', initCurrentInteracionView);
+var CurrentInteractionView = icwsStorage.getView(Interactions, 'currentInteractionView', initCurrentInteractionView);
+
+/** @type {LokiDynamicView<T>} */
+var CurrentAgentView = icwsStorage.getView(Agents, 'currentAgentView', initCurrentAgentView);
+
+/**
+ * Array of accepted workgroups.
+ *
+ * @type {String[]}
+ */
+var __allowedWorkgroups = [
+    'CSA',
+    'Partner Service',
+    // 'ZendeskTest', // possibly
+];
+
+/**
+ * Array of not accepted workgroups.
+ *
+ * @type {String[]}
+ */
+var __disallowedWorkgroups = [];
 
 /**
  * Statistics about the current (daily and weekly) queue.
@@ -50,6 +74,24 @@ var __queueStats = {
  * @type {Boolean}
  */
 var __queueStatsIsUpdated = true;
+
+/**
+ * Data regarding agent availability.
+ *
+ * @type {{ csa: { agentCount: Number, availableAgentCount: Number }, partnerService: { agentCount: Number, availableAgentCount: Number }, total: { agentCount: Number, availableAgentCount: Number } }}
+ */
+var __agentStats = {
+    csa: { agentCount: 0, availableAgentCount: 0 },
+    partnerService: { agentCount: 0, availableAgentCount: 0 },
+    total: { agentCount: 0, availableAgentCount: 0 },
+};
+
+/**
+ * Boolean value for whether the __agentStats object is updated.
+ *
+ * @type {Boolean}
+ */
+var __agentStatsIsUpdated = true;
 
 /**
  * The number of seconds of differance between the ICWS server and the local machine.
@@ -176,6 +218,108 @@ function updateTimeDiff() {
     return __timeDiff;
 }
 
+/********************
+ * User information
+ ********************/
+
+/**
+ * Updates the current user info (availability).
+ */
+function updateAgentInfo() {
+    __agentStats = {
+        csa: getAgentInfo(['CSA']),
+        partnerService: getAgentInfo(['Partner Service']),
+        total: getAgentInfo(__allowedWorkgroups),
+    };
+
+    __agentStatsIsUpdated = true;
+
+    return __agentStats;
+}
+
+/**
+ *
+ * @param {String[]|String} workgroups
+ * @return {{ agentCount: Number, availableAgentCount: Number }}
+ */
+function getAgentInfo(workgroups) {
+    var _agents = CurrentAgentView.data().filter(function (agent) { return hasWorkgroupsSpecial(agent, workgroups) });
+
+    return {
+        agentCount: _agents.length,
+        availableAgentCount: _.filter(_agents, function (agent) { return isAvailable(agent, workgroups); }).length,
+    };
+}
+
+/**
+ * @param {{ loggedIn: Boolean, onPhone: Boolean, statusName: String, workgroups: { name: String }[] }} agent
+ * @param {String[]|String} workgroups
+ * @return {Boolean}
+ */
+function hasWorkgroupsSpecial(agent, workgroups) {
+    var _workgroups = _.isArray(workgroups)
+        ? workgroups
+        : [ workgroups ];
+
+    // When there's a single workgroup and it is 'CSA', agents in 'Partner Service' are not in 'CSA'.
+    var _cases = [
+        _workgroups.length === 1,
+        _workgroups[0] === 'CSA',
+        hasWorkgroups(agent, ['Partner Service']),
+    ];
+
+    // Sales finland isn't okey at all.
+    if (hasWorkgroups(agent, __disallowedWorkgroups)) {
+        return false;
+    }
+
+    // Special rules for non Parter Service calls
+    if (_.every(_cases)) {
+        return false;
+    }
+
+    return hasWorkgroups(agent, _workgroups);
+}
+
+/**
+ * Returns true or false for whether the agent is considered available or not.
+ *
+ * @param {{ loggedIn: Boolean, onPhone: Boolean, statusName: String, workgroups: { name: String }[] }} agent
+ * @param {String[]|String} workgroups
+ * @return {Boolean}
+ */
+function isAvailable(agent, workgroups) {
+    return _.every([
+        // Must be logged in
+        agent.loggedIn,
+        // Must not be on the phone
+        !agent.onPhone,
+        // The status must be 'Available'
+        agent.statusName === 'Available',
+        // Filter out any incorrect workgroups
+        hasWorkgroupsSpecial(agent, workgroups),
+    ]);
+}
+
+/**
+ * Returns true or false for whether *agent* contains any *workgroups*.
+ *
+ * @param {{ workgroups: { name: String }[] } | { name: String }[]} agent
+ * @param {String[]|String} workgroups
+ * @return {Boolean}
+ */
+function hasWorkgroups(agent, workgroups) {
+    var _agentWorkgroups = _.isArray(agent)
+        ? agent
+        : agent.workgroups;
+
+    var _workgroups = _.isArray(workgroups)
+        ? workgroups
+        : [ workgroups ];
+
+    return _.some(_workgroups, function (wg) { return !!_.find(_agentWorkgroups, { name: wg }) });
+}
+
 /*********************************
  * Initializers for dynamic views
  *********************************/
@@ -239,9 +383,19 @@ function initWeeklyInteractionView(view) {
  * @param {LokiDynamicView<T>} view
  * @return {LokiDynamicView<T>}
  */
-function initCurrentInteracionView(view) {
+function initCurrentInteractionView(view) {
     return view
         .applyWhere(function (item) {return item.isCurrent; });
+}
+
+/**
+ * @param {LokiDynamicView<T>} view
+ * @return {LokiDynamicView<T>}
+ */
+function initCurrentAgentView(view) {
+    return view
+        .applyWhere(function (item) { return item.isCurrent; })
+        .applyWhere(function (item) { return hasWorkgroupsSpecial(item, __allowedWorkgroups); });
 }
 
 /************************
@@ -253,15 +407,22 @@ function initCurrentInteracionView(view) {
  */
 function setup() {
     Interactions = icwsStorage.getCollection('interactions');
+    Agents = icwsStorage.getCollection('agents');
+
     TimeDiffView = icwsStorage.getView(Interactions, 'timeDiffView', initTimeDiffView);
     QueuedInteraction = icwsStorage.getView(Interactions, 'queuedInteractions', initQueuedInteractionView);
     DailyInteractionView = icwsStorage.getView(Interactions, 'dailyInteractionView', initDailyInteractionView);
     WeeklyInteractionView = icwsStorage.getView(Interactions, 'weeklyInteractionView', initWeeklyInteractionView);
-    CurrentInteractionView = icwsStorage.getView(Interactions, 'currentInteractionView', initCurrentInteracionView);
+    CurrentInteractionView = icwsStorage.getView(Interactions, 'currentInteractionView', initCurrentInteractionView);
+    CurrentAgentView = icwsStorage.getView(Agents, 'currentAgentView', initCurrentAgentView);
 
     // Set all interactions to not current
     Interactions.findAndUpdate(function () { return true; }, function (item) {
         return _.assign(item, icwsUtils.updateQueueState(item), { isCurrent: false });
+    });
+
+    Agents.findAndUpdate(function () { return true; }, function (agent) {
+        return _.assign(item, { isCurrent: false, });
     });
 
     // update the time diff
@@ -288,4 +449,10 @@ module.exports = {
             partnerServiceInteractions: CurrentInteractionView.data().filter(function (item) { return item.workgroup === 'Partner Service'; }),
         };
     },
+    getAgents: function () { return CurrentAgentView.data(); },
+    getAgentStats: function () { return __agentStats; },
+    getIsAgentStatsUpdated: function () { return __agentStatsIsUpdated; },
+    updateAgentInfo: updateAgentInfo,
+    agentIsAvailable: isAvailable,
+    getAllowedWorkgroups: function () { return __allowedWorkgroups; },
 }
