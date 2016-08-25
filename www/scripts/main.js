@@ -73,7 +73,7 @@ var app = new Vue({
             .map(function (user) { return user; })
             .filter(function (user) { return user.loggedIn })
 
-          this.interactions = ((response.data.interactions || {})._activeInteractions || [])
+          this.interactions = ((response.data.interactions || {}).activeInteractions || [])
               .map(function (interaction) {
                 var user = (this.users.filter(function (usr) { return usr.id === interaction.userName; }) || [])[0];
 

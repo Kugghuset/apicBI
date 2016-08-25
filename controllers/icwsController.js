@@ -9,6 +9,7 @@ var _interval;
 var icwsUser = require('./icws/icws.user');
 var icwsInteraction = require('./icws/icws.interaction');
 var icwsStorage = require('./icws/icws.storage');
+var icwsData = require('./icws/icws.data');
 
 /**
  * Polls the messaging route for new data
@@ -143,6 +144,7 @@ function run() {
               ]
           })
         })
+        .then(function () { return Promise.resolve(icwsData.setup()); })
         .then(setupSubscriptions)
         .then(function (data) {
 
@@ -162,7 +164,7 @@ module.exports = {
     stopPolling: stopPolling,
     run: run,
     getUsers: icwsUser.getUsers,
-    getInteractions: icwsInteraction.getInteractions,
+    getInteractions: icwsData.getInteractions,
     getUserInfo: icwsUser.getUserInfo,
-    getQueueInfo: icwsInteraction.getQueueInfo,
+    getQueueStats: icwsData.getQueueStats,
 };

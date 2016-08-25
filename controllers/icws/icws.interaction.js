@@ -11,6 +11,7 @@ var icwsSub = require('./icws.sub');
 var icws = require('../../lib/icwsModule');
 var icwsStorage = require('./icws.storage');
 var icwsUtils = require('./icws.utils');
+var icwsData = require('./icws.data');
 
 /** @type {LokiCollection<{}>} */
 var Interactions = icwsStorage.getCollection('interactions');
@@ -49,23 +50,6 @@ var __workstations = [];
 var __activeInteractions = [];
 
 /**
- * The differance in seconds in comparison to the server.
- *
- * @type {Number}
- */
-var __localTimeDiff = null;
-
-/**
- * Object containing information about the queues.
- *
- * @type { csa: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }, partnerService: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number } }
- */
-var __queueInfo = {
-    csa: { queueTime: 0, id: null, queueLength: 0, abandonedLength: 0, completedLength: 0, abandonRate: 0 },
-    partnerService: { queueTime: 0, id: null, queueLength: 0, abandonedLength: 0, completedLength: 0, abandonRate: 0 },
-};
-
-/**
  * All watcher methods, exactly matching the keys of _typeIds
  * to allow watch(...) to call any only via the key found from _typeIds.
  */
@@ -99,7 +83,7 @@ function watch(dataArr) {
 
     _.forEach(__activeInteractions, updateCalculatedValues);
 
-    updateQueueInfo();
+    icwsData.updateQueueInfo();
 }
 
 /**
@@ -123,6 +107,7 @@ function updateInteractions(data) {
             // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
             if (icwsUtils.canCalculateQueueTime(interaction)) {
                 interaction.queueTime = icwsUtils.calculateQueueTime(interaction);
+                icwsData.updateTimeDiff();
             }
 
             return interaction;
@@ -134,6 +119,7 @@ function updateInteractions(data) {
         _.forEach(_added, function (interaction) {
             if (icwsUtils.canCalculateQueueTime(interaction)) {
                 interaction.queueTime = icwsUtils.calculateQueueTime(interaction);
+                icwsData.updateTimeDiff();
             }
 
             var _updated = Interactions.findOne({ id: _.toString(interaction.id) });
@@ -163,6 +149,7 @@ function updateInteractions(data) {
                 // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
                 if (icwsUtils.canCalculateQueueTime(_updated)) {
                     _updated.queueTime = icwsUtils.calculateQueueTime(_updated);
+                    icwsData.updateTimeDiff();
                 }
 
                 // Splice in the updated version instead of the original item
@@ -184,6 +171,7 @@ function updateInteractions(data) {
             // If there is no queueTime but both queueDate and connectedDate exists, set queueTime
             if (icwsUtils.canCalculateQueueTime(_updated)) {
                 _updated.queueTime = icwsUtils.calculateQueueTime(_updated);
+                icwsData.updateTimeDiff();
             }
 
             if (icwsUtils.isAbandoned(_updated) && !_updated.isAbandoned) {
@@ -273,24 +261,6 @@ function updateWorkstations(data) {
 }
 
 /**
- * @param {String} granularity
- * @return {Number}
- */
-function getGlobalTimeDiff() {
-    var _diffs = TimeDiffView
-        .data()
-        .reduce(function (arr, item, i) { return arr.length < 10 ? arr.concat([item]) : arr; }, [])
-        .sort(icwsUtils.compareQueueDiff)
-        .map(function (item) { return item.localQueueTime - item.queueTime });
-
-    if (!_.some(_diffs)) {
-        return 0;
-    }
-
-    return _.sum(_diffs) / _diffs.length;
-}
-
-/**
  * Updates *interaction* with the following properties:
  * - inQueue (boolean value of whether the *interaction* is in queue or not.)
  * - correctedQueueTime (calculated time diff between queueDate and Date.now or the actual queueTime (connectedDate - queueDate))
@@ -312,8 +282,8 @@ function updateCalculatedValues(interaction, index) {
 
     // Set correctedQueueTime to either the time diff returned form getInteractionQueueTime or the actual queueTime.
     if (interaction.inQueue) {
-        _correctedQueueTime = getInteractionQueueTime(interaction, true);
-        _localQueueTime = getInteractionQueueTime(interaction, false);
+        _correctedQueueTime = icwsData.getInteractionQueueTime(interaction, true);
+        _localQueueTime = icwsData.getInteractionQueueTime(interaction, false);
     } else {
         _correctedQueueTime = interaction.queueTime || 0;
         _localQueueTime = _storedInteraction.localQueueTime || interaction.localQueueTime;
@@ -336,101 +306,10 @@ function updateCalculatedValues(interaction, index) {
     }
 }
 
-/**
- * @param {String} workgroupName
- * @param {String} span
- * @return {{ queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number })
- */
-function getQueueInfoData(workgroupName, span) {
-    return _.chain(Interactions.where(function (item) { return _.every([
-        item.isCurrent,
-        item.workgroup === workgroupName,
-        item.inQueue,
-    ])}))
-        .map(function (interaction) { return _.assign({}, interaction, { correctedQueueTime: getInteractionQueueTime(interaction, true) }) })
-        .orderBy('correctedQueueTime', 'desc')
-        .thru(function (interactions) { return _.map(interactions, function (interaction) { return _.assign({}, interaction, { queueLength: interactions.length }); }); })
-        .first()
-        .thru(function (interaction) {
-            return _.isUndefined(interaction)
-            ? { id: null, queueTime: 0, queueLength: 0 }
-            : { id: interaction.id, queueTime: interaction.correctedQueueTime, queueLength: interaction.queueLength }
-        })
-        .thru(function (queueInfo) { return _.assign({}, queueInfo, getQueueData(workgroupName, span)); })
-        .value();
-}
 
-/**
- * Updates the longest queue time and ID.
- * @reuturn {{ daily: csa: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }, partnerService: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }, weekly: csa: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number }, partnerService: { queueTime: Number, queueLength: Number, abandonedLength: Number, completedLength: Number, abandonRate: Number, id: Number } }}
- */
-function updateQueueInfo() {
-    __queueInfo = {
-        daily: {
-            csa: getQueueInfoData('CSA', 'daily'),
-            partnerService: getQueueInfoData('Partner Service', 'daily'),
-        },
-        weekly: {
-            csa: getQueueInfoData('CSA', 'weekly'),
-            partnerService: getQueueInfoData('Partner Service', 'weekly'),
-        },
-        timeDiff: __localTimeDiff
-    };
-    return __queueInfo;
-}
-
-/**
- * @param {String} workgroupName
- * @param {String} span
- * @return {{ abandonRate: Number, abandonedLength: Number, completedLength: Number, totalLength: Number }}
- */
-function getQueueData(workgroupName, span) {
-    // Get all either abandoned or completed items, either from today or this week.
-    var _total = (
-        span === 'daily'
-            ? DailyInteractionView
-            : WeeklyInteractionView
-        )
-        .data()
-        .filter(function (interaction) { return interaction.workgroup === workgroupName; });
-
-    // Get only the abandoned items
-    var _abandoned = _total.filter(function (item) { return item.isAbandoned; });
-
-    // Get the completed items
-    var _completed = _total.filter(function (item) { return item.isCompleted; });
-
-    return {
-        abandonRate: ((_abandoned.length / (_total.length || 1)) * 100).toFixed(2),
-        abandonedLength: _abandoned.length,
-        completedLength: _completed.length,
-        totalLength: _total.length,
-    }
-}
-
-/**
- *
- * @param {{ queueDate: Date }} interaction The interaction object to get values from
- * @param {Boolean} [useGlobalTimeDiff=false] Defaults to false
- * @return {Number}
- */
-function getInteractionQueueTime(interaction, useGlobalTimeDiff) {
-    useGlobalTimeDiff = _.isUndefined(useGlobalTimeDiff)
-        ? false
-        : useGlobalTimeDiff;
-
-    __localTimeDiff = getGlobalTimeDiff();
-
-    var _globalTimeDiff = useGlobalTimeDiff
-        ? __localTimeDiff // getGlobalTimeDiff()
-        : 0;
-
-    return moment(new Date()).diff(interaction.queueDate, 'seconds') - _globalTimeDiff;
-}
-
-/****************
- * Subscriptions
- ****************/
+/*********************
+ * ICWS subscriptions
+ *********************/
 
 /**
  * Subscribes or unsubscribes to workstations which are 'CSA'
@@ -528,67 +407,6 @@ function queueSub(action, subId, workstations) {
 }
 
 /**
- * Initializes the TimeDiffView with items only from the last week,
- * items not in queue and where there is a localQueueTime and queueTime
- * and sorts them in reverse as to their natural order (by '$loki', Loki's ID).
- *
- * @param {LokiDynamicView<T>} view
- * @return {LokiDynamicView<T>}
- */
-function initTimeDiffView(view) {
-    return view
-        .applyWhere(function (item) { return moment().subtract(7, 'days').isBefore(item.startDate); })
-        .applyWhere(function (item) { return !item.inQueue; })
-        .applyWhere(function (item) { return _.every([item.localQueueTime, item.queueTime], _.isNumber); })
-        .applySimpleSort('$loki', true)
-}
-
-/**
- * @param {LokiDynamicView<T>} view
- * @return {LokiDynamicView<T>}
- */
-function initDailyInteractionView(view) {
-    return view
-        .applyWhere(function (item) {
-            return _.every([
-                icwsUtils.contains(['Partner Service', 'CSA'], item.workgroup),
-                icwsUtils.isParsableOrDate(item.endDate),
-                icwsUtils.isToday(item),
-            ]);
-        });
-}
-
-/**
- * @param {LokiDynamicView<T>} view
- * @return {LokiDynamicView<T>}
- */
-function initWeeklyInteractionView(view) {
-    return view
-        .applyWhere(function (item) {
-            return _.every([
-                icwsUtils.contains(['Partner Service', 'CSA'], item.workgroup),
-                icwsUtils.isParsableOrDate(item.endDate),
-                icwsUtils.isThisWeek(item),
-            ]);
-        });
-}
-
-/**
- * Sets up the stored data.
- */
-function setupStorage() {
-    Interactions = icwsStorage.getCollection('interactions');
-    TimeDiffView = icwsStorage.getView(Interactions, 'timeDiffView', initTimeDiffView);
-    DailyInteractionView = icwsStorage.getView(Interactions, 'dailyInteractionView', initDailyInteractionView)
-    WeeklyInteractionView = icwsStorage.getView(Interactions, 'weeklyInteractionView', initWeeklyInteractionView)
-
-    // Update all values
-    Interactions.findAndUpdate(function () { return true; }, function (item) {
-        return _.assign(item, icwsUtils.updateQueueState(item), { isCurrent: false });
-    });
-}
-
-/**
  * Sets the workgroup subscriptions up.
  *
  * @param {String} subId Subscription ID string, defaults ot 'kugghuset-1'
@@ -600,9 +418,7 @@ function setup(subId) {
         ? subId
         : 'kugghuset-1';
 
-    setupStorage();
-
-    __localTimeDiff = getGlobalTimeDiff();
+    Interactions = icwsStorage.getCollection('interactions');
 
     return workStationSub('subscribe', subId);
 }
@@ -610,15 +426,4 @@ function setup(subId) {
 module.exports = {
     watch: watch,
     setup: setup,
-    getInteractions: function () {
-        return {
-            activeInteractions: __activeInteractions,
-            _activeInteractions: Interactions.where(function (item) { return item.isCurrent; }),
-            csaInteractions: Interactions.where(function (item) { return item.workgroup === 'CSA', item.isCurrent }),
-            partnerServiceInteractions: Interactions.where(function (item) { return item.workgroup === 'Partner Service', item.isCurrent }),
-        }
-    },
-    getQueueInfo: function () {
-        return __queueInfo;
-    },
 }

@@ -21,7 +21,7 @@ router.get('/api/resources', function (req, res) {
   var users = icwsCtrl.getUsers();
   var userInfo = icwsCtrl.getUserInfo();
   var interactions = icwsCtrl.getInteractions();
-  var queueInfo = icwsCtrl.getQueueInfo();
+  var queueInfo = icwsCtrl.getQueueStats();
 
   res.status(200).json({ users: users, userInfo: userInfo, interactions: interactions, queueInfo: queueInfo });
 });
@@ -39,7 +39,7 @@ router.get('/api/interactions', function (req, res) {
 });
 
 router.get('/api/queue-info', function (req, res) {
-  var queueInfo = icwsCtrl.getQueueInfo();
+  var queueInfo = icwsCtrl.getQueueStats();
 
   res.status(200).json(queueInfo);
 });
