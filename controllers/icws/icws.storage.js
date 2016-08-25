@@ -34,24 +34,24 @@ function onLoaded(err) {
 
 /**
  * Sets up all weekly events for collections.
+ *
+ * @return {void 0}
  */
 function setupWeekly() {
     _storage.listCollections().forEach(function (item) {
         var name = item.name;
 
+        // Set the scheduled removal.
         schedules.setWeekly(name, function () {
             var _coll = getCollection(name);
 
-            /**
-             * TODO: Remove any documents older than a week.
-             */
-
+            // Remove documents which aren't current and older than a week.
             _coll.removeWhere(function (item) {
                 return _.every([
                     !item.isCurrent,
-                    moment().diff(new Date(item.))
+                    moment().diff(new Date(item.meta.updated), 'days') > 7,
                 ]);
-            })
+            });
         });
     });
 }
