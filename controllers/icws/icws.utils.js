@@ -66,6 +66,17 @@ function isCompleted(interaction) {
 }
 
 /**
+ * Returns true or false for whether the interaction is finished.
+ * To be finished, it has to be either completed or abandoned.
+ *
+ * @param {{ endDate: Date, connectedDate: Date, state: String }} interaction The interaction object to get values from
+ * @return {Boolean} Whether the *interaction* is assumed to be completed or not.
+ */
+function isFinished(interaction) {
+    return isAbandoned(interaction) || isCompleted(interaction);
+}
+
+/**
  * Checks whether *item* was started today and returns true or false for it.
  *
  * @param {{ startDate: Date }} interaction
@@ -321,6 +332,7 @@ module.exports = {
     isInQueue: isInQueue,
     isAbandoned: isAbandoned,
     isCompleted: isCompleted,
+    isFinished: isFinished,
     isToday: isToday,
     isThisWeek: isThisWeek,
     getDateDiff: getDateDiff,

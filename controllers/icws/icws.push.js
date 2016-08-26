@@ -5,13 +5,43 @@ var Promise = require('bluebird');
 var moment = require('moment');
 var PowerBi = require('./../../lib/powerBi');
 
-var stateHandler = require('./stateHandler');
+var stateHandler = require('./../stateHandler');
 var azure = require('./../../lib/azure');
 var icwsUtils = require('./icws.utils');
+var icwsStorage = require('./icws.storage');
+
+var PushedPowerBi = icwsStorage.getCollection('pushedPowerBi');
+var config = require('./../../configs/database');
+
+function pickData(item) {
+    return _.pick(item, [
+        'id',
+        'type',
+        'callType',
+        'callDirection',
+        'remoteAddress',
+        'remoteId',
+        'remoteName',
+        'duration',
+        'state',
+        'stateVal',
+        'workgroup',
+        'userName',
+        'startDate',
+        'endDate',
+        'queueDate',
+        'answerDate',
+        'connectedDate',
+        'queueTime',
+        'inQueue',
+        'isAbandoned',
+        'isCompleted',
+    ]);
+}
 
 /**
  * @param {{ daily: {}[], weekly: {}[] }} data
- * @param {Object} powerBi
+ * @param {Object} [powerBi]
  * @param {Number} [attempt=0]
  * @return {Promise}
  */
@@ -26,6 +56,12 @@ function toPowerBi(data, powerBi, attempt) {
 
         if (attempt >= 10) {
             console.log('Too many failed attempts to push ICWS data to Power BI');
+
+            PushedPowerBi.findAndUpdate(
+                function (item) { return _.find(data.weekly, { id: item.id }); },
+                function (item) { return _.assign(item, { isPushed: false, isFailed: true }); }
+            );
+
             return reject(new Error('Too many failed attempts'));
         }
 
@@ -44,7 +80,7 @@ function toPowerBi(data, powerBi, attempt) {
             powerBi = new PowerBi(token);
 
             // Get the datasetId
-            return stateHandler.getDataset('ApicBI', powerBi, attempt > 0);
+            return stateHandler.getDataset(config.dataset, powerBi, attempt > 0);
         })
         .then(function (datasetId) {
             var _promises = _.map({ daily: data.daily, weekly: data.weekly }, function (value, key) {
@@ -52,7 +88,7 @@ function toPowerBi(data, powerBi, attempt) {
                     return Promise.resolve({})
                 }
                 return new Promise(function (_resolve, _reject) {
-                    powerBi.addRows(datasetId, 'icws_agent_' + key, value)
+                    powerBi.addRows(datasetId, 'icws_agent_' + key, pickData(value))
                     .then(function (result) {
                         console.log('Sucessfully pushed ICWS data to Power BI. icws_agent_' + key);
                         resolve(result);
@@ -75,6 +111,11 @@ function toPowerBi(data, powerBi, attempt) {
                 return Promise.reject(new Error('Failed to push ICWS data to Power BI'));
             }
 
+            PushedPowerBi.findAndUpdate(
+                function (item) { return _.find(data.weekly, { id: item.id }); },
+                function (item) { return _.assign(item, { isPushed: true }); }
+            );
+
             return Promise.resolve(_.filter(values, function (value) { return !_.isError(value); }));
         })
         .catch(function (err) {
@@ -82,10 +123,20 @@ function toPowerBi(data, powerBi, attempt) {
 
             return toPowerBi(data, powerBi, attempt += 1);
         });
-
-
-
     });
+}
+
+/**
+ * @param {String} id The id of the interaction
+ * @param {Boolean} hard Should isPushed also be true?
+ * @return {Boolean}
+ */
+function isPushed(id, hard) {
+    if (!id && id !== 0) { return false; }
+
+    return !hard
+        ? !_.isNull(PushedPowerBi.findOne({ id: _.toString(id) }))
+        : !_.isNull(PushedPowerBi.findObject({ id: _.toString(id), isPushed: true }));
 }
 
 /**
@@ -100,10 +151,18 @@ function currentToPowerBi(items) {
     // As both are current, push both of them.
     var _data = { daily: _items, weekly: _items };
 
-    return toPowerBi(data);
+    return toPowerBi(_data);
+}
+
+function setup() {
+    PushedPowerBi = icwsStorage.getCollection('pushedPowerBi');
+
+    return Promise.resolve();
 }
 
 module.exports = {
     toPowerBi: toPowerBi,
     currentToPowerBi: currentToPowerBi,
+    setup: setup,
+    isPushed: isPushed,
 }

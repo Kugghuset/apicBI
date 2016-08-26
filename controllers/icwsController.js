@@ -10,6 +10,7 @@ var icwsUser = require('./icws/icws.user');
 var icwsInteraction = require('./icws/icws.interaction');
 var icwsStorage = require('./icws/icws.storage');
 var icwsData = require('./icws/icws.data');
+var icwsPush = require('./icws/icws.push');
 
 /**
  * Polls the messaging route for new data
@@ -49,11 +50,10 @@ function poll() {
 function setupSubscriptions() {
     return new Promise(function (resolve, reject) {
 
-        var promises = [ icwsUser.setup(), icwsInteraction.setup() ];
+        var promises = [ icwsUser.setup(), icwsInteraction.setup(),icwsPush.setup(), ];
 
         Promise.all(_.map(promises, function (promise) { return promise.reflect(); }))
         .then(function (data) {
-
             resolve(_.map(data, function (val) { return val.isRejected() ? undefined : val.value(); }))
         });
 

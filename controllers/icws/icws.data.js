@@ -9,11 +9,14 @@ var icwsSub = require('./icws.sub');
 var icws = require('../../lib/icwsModule');
 var icwsStorage = require('./icws.storage');
 var icwsUtils = require('./icws.utils');
+var icwsPush = require('./icws.push');
 
 /** @type {LokiCollection<{}>} */
 var Interactions = icwsStorage.getCollection('interactions');
 /** @type {LokiCollection<T>} */
 var Agents = icwsStorage.getCollection('agents');
+/** @type {LokiCollection<T>} */
+var PushedPowerBi = icwsStorage.getCollection('pushedPowerBi');
 
 
 /** @type {LokiDynamicView<T>} */
@@ -408,6 +411,7 @@ function initCurrentAgentView(view) {
 function setup() {
     Interactions = icwsStorage.getCollection('interactions');
     Agents = icwsStorage.getCollection('agents');
+    PushedPowerBi = icwsStorage.getCollection('pushedPowerBi');
 
     TimeDiffView = icwsStorage.getView(Interactions, 'timeDiffView', initTimeDiffView);
     QueuedInteraction = icwsStorage.getView(Interactions, 'queuedInteractions', initQueuedInteractionView);
@@ -424,6 +428,18 @@ function setup() {
     Agents.findAndUpdate(function () { return true; }, function (agent) {
         return _.assign(item, { isCurrent: false, });
     });
+
+    var unPushed = Interactions.where(function (interaction) {
+        // Filter out any none pushed items
+        return icwsPush.isPushed(interaction.id, true) && icwsUtils.isThisWeek(interaction);
+    });
+
+    PushedPowerBi.insert(unPushed.map(function (interaction) { return { id: interaction.id, dateAdded: Date.now(), isPushed: false }; }));
+    icwsPush.toPowerBi({ daily: unPushed.filter(icwsUtils.isToday), weekly: unPushed.filter(icwsUtils.isThisWeek) })
+    .then(function (data) {
+        console.log('Pushed ICWS data to power BI');
+    })
+    .catch(function (err) { console.log(err); console.log(err.trace); });
 
     // update the time diff
     updateTimeDiff()

@@ -2,7 +2,7 @@
  * @type {{ name: String, tables: { name: String, columns: { name: String, dataType: String }[] }[] }}
  */
 module.exports = {
-    name: 'ApicBI',
+    name: 'Dev_ApicBI',
     tables: [
         {
             name: 'day_per_agent', columns: [
@@ -17,10 +17,9 @@ module.exports = {
                 { name: 'Date disconnected', dataType: 'Datetime' },
                 { name: 'Work group', dataType: 'String' }
             ],
-        }
-        ,
+        },
         {
-              name: 'week_per_agent', columns: [
+            name: 'week_per_agent', columns: [
                 { name: 'Agent', dataType: 'String' },
                 { name: 'Call duration in seconds', dataType: 'Int64' },
                 { name: 'Call duration in minutes', dataType: 'Double' },

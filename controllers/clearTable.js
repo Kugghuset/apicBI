@@ -7,9 +7,11 @@ function ClearTable() {}
 ClearTable.run = function(table) {
     if(table == 'daily') { table = 'day_per_agent'; }
     else if(table == 'weekly') { table = 'week_per_agent'; }
-    
+    else if (table == 'icws_daily') { table = 'icws_agent_daily'; }
+    else if (table == 'icws_weekly') { table = 'icws_agent_weekly'; }
+
     var azure = new AzureAuth();
-    azure.getToken().then(function(data) {        
+    azure.getToken().then(function(data) {
         var powerBi = new PowerBi(data.token);
         powerBi.datasetExists('ApicBI').then(function(result) {
             powerBi.clearTable(result.dataset.id, table).then(function(result) {

@@ -12,9 +12,11 @@ var icws = require('../../lib/icwsModule');
 var icwsStorage = require('./icws.storage');
 var icwsUtils = require('./icws.utils');
 var icwsData = require('./icws.data');
+var icwsPush = require('./icws.push');
 
 /** @type {LokiCollection<{}>} */
 var Interactions = icwsStorage.getCollection('interactions');
+var PushedPowerBi = icwsStorage.getCollection('pushedPowerBi');
 
 /**
  * The __types to watch changes for.
@@ -117,11 +119,12 @@ function updateInteractions(data) {
 
             if (_.isNull(_updated)) {
                 // Insert the interaction as it's a legitimately new one
-                Interactions.insert(interaction);
+                // Interactions.insert(interaction);
+                storeInteraction(interaction);
             } else {
                 // Update the interaction
                 _updated = _.assign(_updated, interaction);
-                Interactions.update(_updated);
+                storeInteraction(_updated);
             }
         });
     }
@@ -175,7 +178,7 @@ function updateInteractions(data) {
 
             // Update the interaction
             _updated = _.assign(_updated, interaction);
-            Interactions.update(_updated);
+            storeInteraction(_updated);
         });
     }
 
@@ -193,7 +196,7 @@ function updateInteractions(data) {
 
             // Update the interaction
             _updated.isCurrent = false;
-            Interactions.update(_updated);
+            storeInteraction(_updated);
         });
     }
 }
@@ -293,10 +296,29 @@ function updateCalculatedValues(interaction, index) {
 
     if (_storedInteraction) {
         _storedInteraction = _.assign(_storedInteraction, _updated);
-        Interactions.update(_storedInteraction);
+        storeInteraction(_storedInteraction);
     }
 }
 
+/**
+ * Stores to DB (either inserts or updates) and,
+ * if finished and not pushed, pushes to Power BI.
+ *
+ * @param {{}} interaction
+ */
+function storeInteraction(interaction) {
+    if (!_.isUndefined(interaction.$loki)) {
+        Interactions.update(interaction);
+    } else {
+        Interactions.insert(interaction);
+    }
+
+    if (icwsUtils.isFinished(interaction) && !icwsPush.isPushed(interaction.id)) {
+        // Push it to power BI
+        PushedPowerBi.insert({ id: interaction.id, dateAdded: Date.now(), isPushed: false });
+        icwsPush.currentToPowerBi(interaction);
+    }
+}
 
 /*********************
  * ICWS subscriptions
@@ -410,6 +432,7 @@ function setup(subId) {
         : 'kugghuset-1';
 
     Interactions = icwsStorage.getCollection('interactions');
+    PushedPowerBi = icwsStorage.getCollection('pushedPowerBi');
 
     return workStationSub('subscribe', subId);
 }
