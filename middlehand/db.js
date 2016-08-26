@@ -5,7 +5,7 @@ var r = require('rethinkdb');
 var config = require('./config');
 var utils = require('./utils');
 
-var Eventer = require('./services/eventer').Eventer;
+var Eventer = require('tiny-eventer').Eventer;
 var _eventer = new Eventer();
 
 /** @type {rethinkdb~Connection} */
