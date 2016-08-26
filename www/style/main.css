@@ -44,3 +44,7 @@ tr:not(:last-of-type) {
 .failed {
   background-color: #ff4c4c;
 }
+
+.queued {
+  background-color: #ffffba;
+}

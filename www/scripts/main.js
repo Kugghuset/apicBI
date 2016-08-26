@@ -58,6 +58,7 @@ var app = new Vue({
       ].join('');
     },
     getWorkgroups: function (user) {
+      console.log(JSON.parse(JSON.stringify(user)))
       return user.workgroups.map(function (data) { return data.name }).join(', ');
     }
   },

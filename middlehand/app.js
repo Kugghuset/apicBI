@@ -6,22 +6,15 @@ var r = require('rethinkdb');
 var db = require('./db');
 var config = require('./config');
 
+var Agent = require('./models/agent');
+var Interaction = require('./models/interaction');
+
 db.init({ db: 'icws' })
 .then(function () {
-    return db.initTable('agents');
+    setTimeout(function() {
+        Agent.insert({  })
+    }, 1000);
 })
-.then(function () {
-    return db.table('agents').run(db.conn());
-})
-.then(function (agents) {
-    agents.each(function (err, agent) {
-        if (err) {
-            console.log(err)
-        } else {
-            console.log(agent)
-        }
-    })
-})
-// .then(function (agents) {
-//     console.log(agents)
-// })
+.catch(function (err) {
+    console.log(err);
+});

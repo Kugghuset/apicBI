@@ -5,12 +5,15 @@ var r = require('rethinkdb');
 var config = require('./config');
 var utils = require('./utils');
 
+var Eventer = require('./services/eventer').Eventer;
+var _eventer = new Eventer();
+
 /** @type {rethinkdb~Connection} */
 var _conn = null;
 
 /**
  * @param {String} name
- * @return {Promise<void 0>}
+ * @return {Promise}
  */
 function initDb(name) {
     r.dbList().run(_conn)
@@ -75,6 +78,7 @@ function init(context) {
         return initDb(context.db);
     })
     .then(function () {
+        _eventer.trigger('initialized');
         return Promise.resolve();
     })
 }
@@ -86,4 +90,7 @@ module.exports = {
     initTable: initTable,
     init: init,
     table: function (name) { return r.db(config.db).table(name); },
+    on: _eventer.on,
+    off: _eventer.off,
+    trigger: _eventer.trigger,
 }
