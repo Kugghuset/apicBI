@@ -1,5 +1,6 @@
 var database = {
     dataset: process.env.DATASET || 'ApicBI',
+    dataset_icws: process.env.DATASET_ICWS || 'ApicBI',
     tickety: {
         host: process.env.SQL_TICKETY_SERVER,
         database: process.env.SQL_TICKETY_DATABASE,
