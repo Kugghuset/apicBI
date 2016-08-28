@@ -80,7 +80,7 @@ function toPowerBi(data, powerBi, attempt) {
             powerBi = new PowerBi(token);
 
             // Get the datasetId
-            return stateHandler.getDataset(config.dataset, powerBi, attempt > 0);
+            return stateHandler.getDataset(config.dataset_icws, powerBi, attempt > 0);
         })
         .then(function (datasetId) {
             var _promises = _.map({ daily: data.daily, weekly: data.weekly }, function (value, key) {

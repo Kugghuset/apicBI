@@ -25,9 +25,14 @@ later.setInterval(DB2BI.read, every10Seconds);
 // Instantly call the read method
 DB2BI.read();
 
-// Run the icws module
-icwsController.run();
-// var indexFile = require('./index');
+/**
+ * Outcommented because Power BI cannot add tables to existing datasets.
+ *
+ * // Run the icws module
+ * icwsController.run();
+ * // var indexFile = require('./index');
+ */
+
 
 // Daily clearing of the daily table
 later.setInterval(function () {
