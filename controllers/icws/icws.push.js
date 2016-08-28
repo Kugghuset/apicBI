@@ -88,12 +88,16 @@ function toPowerBi(data, powerBi, attempt) {
                     return Promise.resolve({})
                 }
                 return new Promise(function (_resolve, _reject) {
-                    powerBi.addRows(datasetId, 'icws_agent_' + key, pickData(value))
+                    console.log('Pushing ICWS data to Power BI. icws_agent_' + key);
+                    powerBi.addRows(datasetId, 'icws_agent_' + key, _.map(value, pickData))
                     .then(function (result) {
                         console.log('Sucessfully pushed ICWS data to Power BI. icws_agent_' + key);
                         resolve(result);
                     })
-                    .catch(reject);
+                    .catch(function (err) {
+                        console.log('Failed to Push ICWS data for icws_agent' + key + ': ' + _.isError(err) ? err.toString() : JSON.stringify(err));
+                        reject(err);
+                    });
                 });
             });
 

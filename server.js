@@ -27,6 +27,7 @@ DB2BI.read();
 
 // Run the icws module
 icwsController.run();
+// var indexFile = require('./index');
 
 // Daily clearing of the daily table
 later.setInterval(function () {

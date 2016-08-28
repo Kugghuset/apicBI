@@ -430,8 +430,8 @@ function setup() {
     });
 
     var unPushed = Interactions.where(function (interaction) {
-        // Filter out any none pushed items
-        return icwsPush.isPushed(interaction.id, true) && icwsUtils.isThisWeek(interaction);
+        // Get only not pushed interactions
+        return !icwsPush.isPushed(interaction.id, true) && icwsUtils.isThisWeek(interaction);
     });
 
     PushedPowerBi.insert(unPushed.map(function (interaction) { return { id: interaction.id, dateAdded: Date.now(), isPushed: false }; }));

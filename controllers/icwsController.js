@@ -154,6 +154,7 @@ function run() {
         })
         .catch(function (err) {
             console.log(err);
+            console.log(err.trace)
             reject(err);
         })
 
