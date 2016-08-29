@@ -7,6 +7,8 @@ var icwsSub = require('./icws.sub');
 var icwsStorage = require('./icws.storage');
 var icwsData = require('./icws.data');
 
+var config = require('./../../configs/database');
+
 /** @type {LokiCollection<T>} */
 var Agents = icwsStorage.getCollection('agents');
 
@@ -218,13 +220,13 @@ function getAvailability(agent) {
  * Subscribes or unsubscribes to updates to the user list.
  *
  * @param {String} action The action to take, should be either subscribe or unsubscribe. Defaults to subscribe
- * @param {String} subId Subscription ID string, defaults to 'kugghuset-1'
+ * @param {String} subId Subscription ID string, defaults to config.icws_sub_id
  */
 function userListSub(action, subId) {
     // Use default value of subId if undefined
     subId = !_.isUndefined(subId)
         ? subId
-        : 'kugghuset-1';
+        : config.icws_sub_id;
 
     var path = 'messaging/subscriptions/configuration/users/:id'
         .replace(':id', subId);
@@ -273,14 +275,14 @@ function userStatusSub(action, users) {
 /**
  * Sets the user subscriptions up.
  *
- * @param {String} subId Subscription ID string, defaults to 'kugghuset-1'
+ * @param {String} subId Subscription ID string, defaults to config.icws_sub_id
  * @return {Promise}
  */
 function setup(subId) {
     // Use default value of subId if undefined
     subId = !_.isUndefined(subId)
         ? subId
-        : 'kugghuset-1';
+        : config.icws_sub_id;
 
     Agents = icwsStorage.getCollection('agents');
 
