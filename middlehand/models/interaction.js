@@ -1,16 +1,8 @@
 'use strict'
 
-var db = require('./../db');
+var _ = require('lodash');
 
-db.on('initialized', function () {
-    db.initTable('interaction', { primaryKey: '_id', })
-    .then(function () {
-        console.log('interaction table initialized.');
-    })
-    .catch(function (err) {
-        console.log('Failed to initialize interaction table: ' + err.toString());
-    });
-});
+var db = require('./../db');
 
 var Interaction = db.table('interaction');
 
@@ -40,4 +32,17 @@ var schema = {
     isCurrent: Boolean,
 };
 
-module.exports = Interaction;
+/**
+ * Initializes the agent table in the DB.
+ */
+function init() {
+    db.initTable('interaction', { primaryKey: '_id', })
+    .then(function () {
+        console.log('interaction table initialized.');
+    })
+    .catch(function (err) {
+        console.log('Failed to initialize interaction table: ' + err.toString());
+    });
+}
+
+module.exports = _.assign(Interaction, { init: init });

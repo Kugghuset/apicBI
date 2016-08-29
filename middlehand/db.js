@@ -16,7 +16,7 @@ var _conn = null;
  * @return {Promise}
  */
 function initDb(name) {
-    r.dbList().run(_conn)
+    return r.dbList().run(_conn)
     .then(function (dbs) {
         // If the db name already exists, use it and resolve
         if (utils.contains(dbs, name)) {
