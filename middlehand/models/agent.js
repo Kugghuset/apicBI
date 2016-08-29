@@ -32,17 +32,28 @@ var schema = {
     isCurrent: Boolean,
 };
 
-/**
- * Initializes the agent table in the DB.
- */
-function init() {
-    db.initTable('agent', { primaryKey: '_id', })
-    .then(function () {
-        console.log('agent table initialized.');
-    })
-    .catch(function (err) {
-        console.log('Failed to initialize agent table: ' + err.toString());
+function listen(callback) {
+    Agent.changes().run(db.conn(), function (err, cursor) {
+        if (err) { callback(err); }
+        else { cursor.each(callback); }
     });
 }
 
-module.exports = _.assign(Agent, { init: init, });
+/**
+ * Initializes the agent table in the DB.
+ *
+ * @return {Promise}
+ */
+function init() {
+    return db.initTable('agent', { primaryKey: '_id', })
+    .then(function () {
+        console.log('agent table initialized.');
+        return Promise.resolve();
+    })
+    .catch(function (err) {
+        console.log('Failed to initialize agent table: ' + err.toString());
+        return Promise.reject(err);
+    });
+}
+
+module.exports = _.assign(Agent, { init: init, listen: listen });

@@ -6,6 +6,8 @@ var Promise = require('bluebird');
 var icwsSub = require('./icws.sub');
 var icwsStorage = require('./icws.storage');
 var icwsData = require('./icws.data');
+var icwsUtils = require('./icws.utils');
+var icwsDb = require('./icws.db');
 
 var config = require('./../../configs/database');
 
@@ -184,11 +186,18 @@ function updateStatuses(data) {
             _user = _.assign(_user, user, _updates);
         }
 
+        var _isUpdated = !icwsUtils.objectEquals(_agent, _.assign(_agent, user, _updates));
+
         // If there is a user and a persisted user.
-        if (_agent) {
+        if (_agent && _isUpdated) {
             // Apply updates
             _agent = _.assign(_agent, user, _updates);
             Agents.update(_agent);
+
+            console.log('Setting agents')
+
+            // Update or set the user in RethinkDB.
+            icwsDb.setAgent(_agent);
         }
     });
 

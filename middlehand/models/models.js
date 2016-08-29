@@ -1,6 +1,7 @@
 'use strict'
 
 var _ = require('lodash');
+var utils = require('./../utils');
 
 var Agent = require('./agent');
 var Interaction = require('./interaction');
@@ -14,7 +15,7 @@ var __models = {
  * Initializes all models.
  */
 function init() {
-    _.forEach(__models, function (model, name) { model.init(); });
+    return utils.settle(_.map(__models, function (model) { return model.init(); }));
 }
 
 module.exports = {

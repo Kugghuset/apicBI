@@ -32,17 +32,27 @@ var schema = {
     isCurrent: Boolean,
 };
 
+function listen(callback) {
+    Interaction.changes().run(db.conn(), function (err, cursor) {
+        if (err) { callback(err); }
+        else { cursor.each(callback); }
+    });
+}
+
 /**
  * Initializes the agent table in the DB.
  */
 function init() {
-    db.initTable('interaction', { primaryKey: '_id', })
+    return db.initTable('interaction', { primaryKey: '_id', })
     .then(function () {
         console.log('interaction table initialized.');
+
+        return Promise.resolve();
     })
     .catch(function (err) {
         console.log('Failed to initialize interaction table: ' + err.toString());
+        return Promise.reject(err);
     });
 }
 
-module.exports = _.assign(Interaction, { init: init });
+module.exports = _.assign(Interaction, { init: init, listen: listen });

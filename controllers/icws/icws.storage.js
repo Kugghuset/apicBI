@@ -124,7 +124,7 @@ function init() {
  */
 function getCollection(name) {
     return _.isNull(_storage.getCollection(name))
-        ? _storage.addCollection(name)
+        ? _storage.addCollection(name, { disableChangesApi: false })
         : _storage.getCollection(name);
 }
 

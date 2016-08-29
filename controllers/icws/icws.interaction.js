@@ -13,6 +13,7 @@ var icwsStorage = require('./icws.storage');
 var icwsUtils = require('./icws.utils');
 var icwsData = require('./icws.data');
 var icwsPush = require('./icws.push');
+var icwsDb = require('./icws.db');
 
 var config = require('./../../configs/database');
 
@@ -79,6 +80,8 @@ function watch(dataArr) {
     _.forEach(__activeInteractions, updateCalculatedValues);
 
     icwsData.updateQueueInfo();
+
+    pushChanges();
 }
 
 /**
@@ -296,7 +299,10 @@ function updateCalculatedValues(interaction, index) {
     // Replace the item in the list.
     __activeInteractions.splice(index, 1, _updated);
 
-    if (_storedInteraction) {
+    var _isUpdated = !icwsUtils.objectEquals(_storedInteraction,  _.assign(_storedInteraction, _updated));
+
+    // If there's been an update and there's an object in the DB, push it.
+    if (_storedInteraction && _isUpdated) {
         _storedInteraction = _.assign(_storedInteraction, _updated);
         storeInteraction(_storedInteraction);
     }
@@ -325,6 +331,25 @@ function storeInteraction(interaction) {
             console.log('Something went wrong when pushing to Power BI: ' + err.toString());
         });
     }
+}
+
+/**
+ * Pushes any changes
+ */
+function pushChanges() {
+    Interactions.getChanges()
+    .forEach(function (item) {
+        // If the interaction was removed, disable it in the DB.
+        // Otherwise find it and update or insert it
+        var _interaction = item.operation !== 'R'
+            ? item.obj
+            : _.assign({}, item.obj, { isDisabled: true });
+
+        icwsDb.setInteraction(_interaction, true);
+    });
+
+    // Clear the changes for Interactions
+    Interactions.flushChanges();
 }
 
 /*********************
