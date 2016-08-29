@@ -306,7 +306,7 @@ function updateCalculatedValues(interaction, index) {
  * Stores to DB (either inserts or updates) and,
  * if finished and not pushed, pushes to Power BI.
  *
- * @param {{}} interaction
+ * @param {{ id: String, $loki: Number, ... }} interaction
  */
 function storeInteraction(interaction) {
     if (!_.isUndefined(interaction.$loki)) {
@@ -318,7 +318,12 @@ function storeInteraction(interaction) {
     if (icwsUtils.isFinished(interaction) && !icwsPush.isPushed(interaction.id)) {
         // Push it to power BI
         PushedPowerBi.insert({ id: interaction.id, dateAdded: Date.now(), isPushed: false });
-        icwsPush.currentToPowerBi(interaction);
+        icwsPush.currentToPowerBi(interaction)
+        .then(function (data) { /** Do something? */ })
+        .catch(function (err) {
+            // Must be caught, otherwise it might break stuff.
+            console.log('Something went wrong when pushing to Power BI: ' + err.toString());
+        });
     }
 }
 
