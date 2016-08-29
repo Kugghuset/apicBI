@@ -50,7 +50,7 @@ function poll() {
 function setupSubscriptions() {
     return new Promise(function (resolve, reject) {
 
-        var promises = [ icwsUser.setup(), icwsInteraction.setup(),icwsPush.setup(), ];
+        var promises = [ icwsUser.setup(), icwsInteraction.setup(), icwsPush.setup(), ];
 
         Promise.all(_.map(promises, function (promise) { return promise.reflect(); }))
         .then(function (data) {
@@ -144,8 +144,8 @@ function run() {
               ]
           })
         })
-        .then(function () { return Promise.resolve(icwsData.setup()); })
         .then(setupSubscriptions)
+        .then(function () { return Promise.resolve(icwsData.setup()); })
         .then(function (data) {
 
             startPolling();

@@ -14,6 +14,8 @@ var icwsUtils = require('./icws.utils');
 var icwsData = require('./icws.data');
 var icwsPush = require('./icws.push');
 
+var config = require('./../../configs/database');
+
 /** @type {LokiCollection<{}>} */
 var Interactions = icwsStorage.getCollection('interactions');
 var PushedPowerBi = icwsStorage.getCollection('pushedPowerBi');
@@ -244,7 +246,7 @@ function updateWorkstations(data) {
         // Get the ids to added workstations, if any, subscribe to their queues
         var _addedIds = _.map(_added, 'id');
         if (_.some(_addedIds)) {
-            queueSub('subscribe', 'kugghuset-1', _addedIds);
+            queueSub('subscribe', config.icws_sub_id, _addedIds);
         }
 
         // If removed, unsubscribe
@@ -304,7 +306,7 @@ function updateCalculatedValues(interaction, index) {
  * Stores to DB (either inserts or updates) and,
  * if finished and not pushed, pushes to Power BI.
  *
- * @param {{}} interaction
+ * @param {{ id: String, $loki: Number, ... }} interaction
  */
 function storeInteraction(interaction) {
     if (!_.isUndefined(interaction.$loki)) {
@@ -316,7 +318,12 @@ function storeInteraction(interaction) {
     if (icwsUtils.isFinished(interaction) && !icwsPush.isPushed(interaction.id)) {
         // Push it to power BI
         PushedPowerBi.insert({ id: interaction.id, dateAdded: Date.now(), isPushed: false });
-        icwsPush.currentToPowerBi(interaction);
+        icwsPush.currentToPowerBi(interaction)
+        .then(function (data) { /** Do something? */ })
+        .catch(function (err) {
+            // Must be caught, otherwise it might break stuff.
+            console.log('Something went wrong when pushing to Power BI: ' + err.toString());
+        });
     }
 }
 
@@ -329,13 +336,13 @@ function storeInteraction(interaction) {
  * with the subscription id *subId*.
  *
  * @param {String} action The action to run
- * @param {String} subId Defaults to 'kugghuset-1'
+ * @param {String} subId Defaults to config.icws_sub_id
  * @return {Promise}
  */
 function workStationSub(action, subId) {
     subId = !_.isUndefined(subId)
         ? subId
-        : 'kugghuset-1';
+        : config.icws_sub_id;
 
     var path = 'messaging/subscriptions/configuration/workgroups/:id'
         .replace(':id', subId)
@@ -371,7 +378,7 @@ function queueSub(action, subId, workstations) {
     // Use default value of subId if undefined
     subId = !_.isUndefined(subId)
         ? subId
-        : 'kugghuset-1';
+        : config.icws_sub_id;
 
     // Get all queueIds to subscribe to
     var _queueIds = _.chain(workstations)
@@ -422,14 +429,14 @@ function queueSub(action, subId, workstations) {
 /**
  * Sets the workgroup subscriptions up.
  *
- * @param {String} subId Subscription ID string, defaults ot 'kugghuset-1'
+ * @param {String} subId Subscription ID string, defaults ot config.icws_sub_id
  * @return {Promise}
  */
 function setup(subId) {
   // Use default value of subId if undefined
     subId = !_.isUndefined(subId)
         ? subId
-        : 'kugghuset-1';
+        : config.icws_sub_id;
 
     Interactions = icwsStorage.getCollection('interactions');
     PushedPowerBi = icwsStorage.getCollection('pushedPowerBi');

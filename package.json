@@ -15,10 +15,11 @@
     "init_icws": "node init.js -dataset ApicBI_ICWS",
     "reinit_icws": "node init.js -dataset ApicBI_ICWS -reinit 1",
     "clean_icws": "node clean.js -dataset ApicBI_ICWS",
+    "clean_pushed_icws": "node clean_pushed.js",
     "clear_dataset_icws": "node clear_file.js -filepath assets/datasets_ApicBI_ICWS.json",
     "clear_session_icws": "npm run clear_token && npm run clear_dataset_icws",
-    "reset_icws": "npm run clean_icws && npm run init && npm run clear_session_icws",
-    "hard_reset_icws": "npm run clean_icws && npm run reinit_icws && npm run clear_session_icws"
+    "reset_icws": "npm run clean_icws && npm run init && npm run clear_session_icws && npm run clean_pushed_icws",
+    "hard_reset_icws": "npm run clean_icws && npm run reinit_icws && npm run clear_session_icws && npm run clean_pushed_icws"
   },
   "description": "A communication layer between ICWS and Power BI",
   "main": "index.js",

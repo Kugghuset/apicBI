@@ -4,7 +4,7 @@ env('./.env');
 
 var DB2BI = require('./controllers/db2bi');
 var ClearTable = require('./controllers/clearTable');
-var icwsController = require('./controllers/icwsController');
+// var icwsController = require('./controllers/icwsController');
 
 // Schedule which will run every 10 seconds
 var every10Seconds = later.parse.recur()
@@ -38,12 +38,12 @@ DB2BI.read();
 later.setInterval(function () {
     // Clear the day_per_agent table in ApicBI
     ClearTable.run('daily');
-    ClearTable.run('icws_daily');
+    // ClearTable.run('icws_daily');
 }, everyStartOfDay);
 
 // Weekly clearing of the weekly table
 later.setInterval(function () {
     // Clear the week_per_agent table in ApicBI
     ClearTable.run('weekly');
-    ClearTable.run('icws_weekly');
+    // ClearTable.run('icws_weekly');
 }, everyStartOfWeek);
