@@ -12,10 +12,11 @@ var _intervals = [];
 /**
  * Storage of all schedules to run
  *
- * @type {{ weekly: { id: String, callback: Function }[] }}
+ * @type {{ weekly: { id: String, callback: Function }[], daily: { id: String, callback: Function }[] }}
  */
 var _schedules = {
-    weekly: []
+    weekly: [],
+    daily: [],
 };
 
 /**
@@ -30,6 +31,8 @@ function _callFn(fn) { return fn(); }
  * @param {String} type
  */
 function _call(type) {
+    console.log('Scheduled event for ' + type + ' at ' + moment().format('YYYY-MM-DD HH:mm:ss'));
+
     // Call all callable callbacks
     _.chain(_schedules[type])
         // Get only the callbacks
@@ -46,6 +49,13 @@ function _call(type) {
  */
 var _weeklySchedule = later.parse.recur()
     .on(2).dayOfWeek()
+    .first().hour();
+
+/**
+ * Later.js schedule which will run every morning at 1 AM (local to the machine).
+ */
+var _dailySchedule = later.parse.recur()
+    .every().dayOfWeek()
     .first().hour();
 
 /**
@@ -105,6 +115,8 @@ function setWeekly(id, callback) {
         callback: callback,
     });
 
+    console.log('Added weekly schedule: ' + id);
+
     // return the added object
     return getSchedule('weekly', id);
 }
@@ -125,16 +137,59 @@ function removeWeekly(id) {
     return _existing;
 }
 
+
+/**
+ * Sets a weekly schedule with the id *id* which will call *callback* every time it happens.
+ *
+ * @param {String} id
+ * @param {Function} callback
+ * @return {{ id: String, callback: Function }}
+ */
+function setDaily(id, callback) {
+    // If there is an id matching *id*, remove it.
+    removeDaily(id);
+
+    // Push the schedule item to weekly
+    _schedules.daily.push({
+        id: id,
+        callback: callback,
+    });
+
+    console.log('Added daily schedule: ' + id);
+
+    // return the added object
+    return getSchedule('daily', id);
+}
+
+/**
+ * Removes
+ *
+ * @param {String} id
+ * @return {{ id: String, callback: Function }}
+ */
+function removeDaily(id) {
+    var _existing = getSchedule('daily', id);
+
+    if (_.isNull(_existing)) {
+        _schedules.daily = _schedules.daily.filter(function (schedule) { return schedule !== _existing; });
+    }
+
+    return _existing;
+}
+
 /**
  * Sets up the schedules.
  */
 function setup() {
     // Start the weekly interval
     startInterval('weekly', _weeklySchedule);
+    startInterval('daily', _dailySchedule);
 }
 
 module.exports = {
     setup: setup,
     setWeekly: setWeekly,
+    setDaily: setDaily,
     removeWeekly: removeWeekly,
+    removeDaily: removeDaily,
 }

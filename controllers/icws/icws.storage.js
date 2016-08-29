@@ -29,6 +29,7 @@ function onLoaded(err) {
         console.log('Database loaded automatically');
         _isLoaded = true;
         setupWeekly();
+        setupDaily();
     }
 }
 
@@ -52,7 +53,23 @@ function setupWeekly() {
                     moment().diff(new Date(item.meta.updated), 'days') > 7,
                 ]);
             });
+
         });
+    });
+
+    schedules.setWeekly('weekly-icws-powerBi', function () {
+        ClearTable.run('icws_weekly');
+    });
+}
+
+/**
+ * Sets up all daily events for collections
+ *
+ * @return {void 0}
+ */
+function setupDaily() {
+    schedules.setDaily('daily-icws-powerBi', function () {
+        ClearTable.run('icws_daily');
     });
 }
 
@@ -89,6 +106,7 @@ function init() {
 
             _isLoaded = true;
             setupWeekly();
+            setupDaily();
 
             resolve(_storage);
         });
@@ -148,4 +166,11 @@ module.exports = {
     getCollection: getCollection,
     getView: getView,
     storage: _storage,
+    allCollections: function () {
+        return {
+            Interactions: icwsStorage.getCollection('interactions'),
+            Agents: icwsStorage.getCollection('agents'),
+            PushedPowerBi: icwsStorage.getCollection('pushedPowerBi'),
+        };
+    },
 }

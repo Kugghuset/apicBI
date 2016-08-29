@@ -431,7 +431,11 @@ function setup() {
 
     var unPushed = Interactions.where(function (interaction) {
         // Get only not pushed interactions
-        return !icwsPush.isPushed(interaction.id, true) && icwsUtils.isThisWeek(interaction);
+        return _.every([
+            icwsUtils.isFinished(interaction),
+            !icwsPush.isPushed(interaction.id, true),
+            icwsUtils.isThisWeek(interaction),
+        ]);
     });
 
     PushedPowerBi.insert(unPushed.map(function (interaction) { return { id: interaction.id, dateAdded: Date.now(), isPushed: false }; }));

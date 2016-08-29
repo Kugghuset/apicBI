@@ -13,30 +13,63 @@ var icwsStorage = require('./icws.storage');
 var PushedPowerBi = icwsStorage.getCollection('pushedPowerBi');
 var config = require('./../../configs/database');
 
+/**
+ * Picks and cleans data into actual types and returns it.
+ *
+ * @param {{ id: String, type: String, callType: String, callDirection: String, remoteAddress: String, remoteId: String, remoteName: String, duration: Number, state: String, stateVal: String, workgroup: String, userName: String, startDate: Date, endDate: Date, queueDate: Date, answerDate: Date, connectedDate: Date, queueTime: Number, inQueue: Boolean, isAbandoned: Boolean, isCompleted: Boolean }} item
+ * @return {{ id: String, type: String, callType: String, callDirection: String, remoteAddress: String, remoteId: String, remoteName: String, duration: Number, state: String, stateVal: String, workgroup: String, userName: String, startDate: Date, endDate: Date, queueDate: Date, answerDate: Date, connectedDate: Date, queueTime: Number, inQueue: Number, isAbandoned: Number, isCompleted: Number }}
+ */
 function pickData(item) {
-    return _.pick(item, [
-        'id',
-        'type',
-        'callType',
-        'callDirection',
-        'remoteAddress',
-        'remoteId',
-        'remoteName',
-        'duration',
-        'state',
-        'stateVal',
-        'workgroup',
-        'userName',
-        'startDate',
-        'endDate',
-        'queueDate',
-        'answerDate',
-        'connectedDate',
-        'queueTime',
-        'inQueue',
-        'isAbandoned',
-        'isCompleted',
-    ]);
+    var _strings = _.chain(item)
+        .pick([
+            'id',
+            'type',
+            'callType',
+            'callDirection',
+            'remoteAddress',
+            'remoteId',
+            'remoteName',
+            'state',
+            'stateVal',
+            'workgroup',
+            'userName',
+        ])
+        .map(function (val, key) { return { name: key, value: _.toString(val) }; })
+        .value();
+
+    var _dates = _.chain(item)
+        .pick([
+            'startDate',
+            'endDate',
+            'queueDate',
+            'answerDate',
+            'connectedDate',
+        ])
+        .map(function (val, key) { return { name: key, value: moment(new Date(val)).isValid() ? new Date(val) : null }; })
+        .value();
+
+    var _numbers = _.chain(item)
+        .pick([
+            'duration',
+            'queueTime',
+        ])
+        .map(function (val, key) { return { name: key, value: isNaN(parseInt(val)) ? -1 : parseInt(val) }; })
+        .value();
+
+    var _bools = _.chain(item)
+        .pick([
+            'inQueue',
+            'isAbandoned',
+            'isCompleted',
+        ])
+        .map(function (val, key) { return { name: key, value: !!val ? 1 : 0 }; })
+        .value();
+
+    return _.chain([])
+        .thru(function (arr) { return arr.concat(_strings).concat(_dates).concat(_numbers).concat(_bools); })
+        .thru(function (_items) { return _.reduce(_items, function (obj, val)  { return _.assign({}, obj, _.set({}, val.name, val.value)); }, {}); })
+        .value();
+
 }
 
 /**
@@ -87,17 +120,16 @@ function toPowerBi(data, powerBi, attempt) {
                 if (!(value && value.length)) {
                     return Promise.resolve({})
                 }
-                return new Promise(function (_resolve, _reject) {
-                    console.log('Pushing ICWS data to Power BI. icws_agent_' + key);
-                    powerBi.addRows(datasetId, 'icws_agent_' + key, _.map(value, pickData))
-                    .then(function (result) {
-                        console.log('Sucessfully pushed ICWS data to Power BI. icws_agent_' + key);
-                        resolve(result);
-                    })
-                    .catch(function (err) {
-                        console.log('Failed to Push ICWS data for icws_agent' + key + ': ' + _.isError(err) ? err.toString() : JSON.stringify(err));
-                        reject(err);
-                    });
+
+                console.log('Pushing ICWS data to Power BI. icws_agent_' + key + ', ' + value.length + ' rows.');
+                return powerBi.addRows(datasetId, 'icws_agent_' + key, _.map(value, pickData))
+                .then(function (result) {
+                    console.log('Sucessfully pushed ICWS data to Power BI. icws_agent_' + key);
+                    Promise.resolve(result);
+                })
+                .catch(function (err) {
+                    console.log('Failed to Push ICWS data for icws_agent' + key + ': ' + _.isError(err) ? err.toString() : JSON.stringify(err));
+                    Promise.reject(err);
                 });
             });
 
@@ -120,7 +152,7 @@ function toPowerBi(data, powerBi, attempt) {
                 function (item) { return _.assign(item, { isPushed: true }); }
             );
 
-            return Promise.resolve(_.filter(values, function (value) { return !_.isError(value); }));
+            return resolve(_.filter(values, function (value) { return !_.isError(value); }));
         })
         .catch(function (err) {
             console.log('Failed to push ICWS data to Power BI: ' + err.toString());
@@ -140,7 +172,7 @@ function isPushed(id, hard) {
 
     return !hard
         ? !_.isNull(PushedPowerBi.findOne({ id: _.toString(id) }))
-        : !_.isNull(PushedPowerBi.findObject({ id: _.toString(id), isPushed: true }));
+        : !_.isNull(PushedPowerBi.findOne({ id: _.toString(id), isPushed: true }));
 }
 
 /**
