@@ -1,9 +1,23 @@
 
+/**
+ * Converts somewhat boolean values and strings such as 'false'.
+ *
+ * @param {Any} input
+ * @return {Boolean}
+ */
+const parseBool = (input) => {
+  if (typeof input === 'undefined') { return undefined; }
+  if (typeof input === 'boolean') { return input; }
+  if (typeof input === 'string') { return input != 'false'; }
+
+  return !!input;
+}
 
 var database = {
     dataset: process.env.DATASET || 'ApicBI',
     dataset_icws: process.env.DATASET_ICWS || 'ApicBI_ICWS',
     icws_sub_id: process.env.ICWS_SUB_ID || 'kugghuset-1',
+    allow_push: typeof process.env.ALLOW_PUSH === 'undefinend' ? false : parseBool(process.env.ALLOW_PUSH),
     tickety: {
         host: process.env.SQL_TICKETY_SERVER,
         database: process.env.SQL_TICKETY_DATABASE,

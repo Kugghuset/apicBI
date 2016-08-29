@@ -79,86 +79,89 @@ function pickData(item) {
  * @return {Promise}
  */
 function toPowerBi(data, powerBi, attempt) {
-    return new Promise(function (resolve, reject) {
-        if (_.isUndefined(attempt)) {
-            console.log('Pushing ICWS data.');
-            attempt = 0;
-        } else {
-            console.log('Attempting to push ICWS data again. ' + attempt + ' attempt');
-        }
+    if (_.isUndefined(attempt)) {
+        console.log('Pushing ICWS data.');
+        attempt = 0;
+    } else {
+        console.log('Attempting to push ICWS data again. ' + attempt + ' attempt');
+    }
 
-        if (attempt >= 10) {
-            console.log('Too many failed attempts to push ICWS data to Power BI');
+    if (attempt >= 10) {
+        console.log('Too many failed attempts to push ICWS data to Power BI');
 
-            PushedPowerBi.findAndUpdate(
-                function (item) { return _.find(data.weekly, { id: item.id }); },
-                function (item) { return _.assign(item, { isPushed: false, isFailed: true }); }
-            );
+        PushedPowerBi.findAndUpdate(
+            function (item) { return _.find(data.weekly, { id: item.id }); },
+            function (item) { return _.assign(item, { isPushed: false, isFailed: true }); }
+        );
 
-            return reject(new Error('Too many failed attempts'));
-        }
+        return Promise.reject(new Error('Too many failed attempts'));
+    }
 
-        // Check for values, if there are any
-        if (!_.some([data.daily, data.weekly], _.some)) {
-            // There is nothing to push to Power BI.
-            return resolve({});
-        }
+    // Check for values, if there are any
+    if (!_.some([data.daily, data.weekly], _.some)) {
+        // There is nothing to push to Power BI.
+        return Promise.resolve({});
+    }
 
-        var _method = (attempt > 0)
-            ? 'refresh'
-            : 'local';
+    var _method = (attempt > 0)
+        ? 'refresh'
+        : 'local';
 
-        azure.getToken(_method)
-        .then(function (token) {
-            powerBi = new PowerBi(token);
+    return azure.getToken(_method)
+    .then(function (token) {
+        powerBi = new PowerBi(token);
 
-            // Get the datasetId
-            return stateHandler.getDataset(config.dataset_icws, powerBi, attempt > 0);
-        })
-        .then(function (datasetId) {
-            var _promises = _.map({ daily: data.daily, weekly: data.weekly }, function (value, key) {
-                if (!(value && value.length)) {
-                    return Promise.resolve({})
-                }
+        // Get the datasetId
+        return stateHandler.getDataset(config.dataset_icws, powerBi, attempt > 0);
+    })
+    .then(function (datasetId) {
+        var _promises = _.map({ daily: data.daily, weekly: data.weekly }, function (value, key) {
+            if (!(value && value.length)) {
+                return Promise.resolve({})
+            }
 
-                console.log('Pushing ICWS data to Power BI. icws_agent_' + key + ', ' + value.length + ' rows.');
-                return powerBi.addRows(datasetId, 'icws_agent_' + key, _.map(value, pickData))
-                .then(function (result) {
-                    console.log('Sucessfully pushed ICWS data to Power BI. icws_agent_' + key);
-                    Promise.resolve(result);
-                })
-                .catch(function (err) {
-                    console.log('Failed to Push ICWS data for icws_agent' + key + ': ' + _.isError(err) ? err.toString() : JSON.stringify(err));
-                    Promise.reject(err);
-                });
+            if (!config.allow_push) {
+                console.log('Won\'t push. Would have pushed ICWS data to Power BI. icws_agent_' + key + ', ' + value.length + ' rows.');
+                return Promise.resolve({});
+            }
+
+            console.log('Pushing ICWS data to Power BI. icws_agent_' + key + ', ' + value.length + ' rows.');
+            return powerBi.addRows(datasetId, 'icws_agent_' + key, _.map(value, pickData))
+            .then(function (result) {
+                console.log('Sucessfully pushed ICWS data to Power BI. icws_agent_' + key);
+                return Promise.resolve(result);
+            })
+            .catch(function (err) {
+                console.log('Failed to Push ICWS data for icws_agent' + key + ': ' + _.isError(err) ? err.toString() : JSON.stringify(err));
+                return Promise.reject(err);
             });
-
-            return icwsUtils.settle(_promises);
-        })
-        .then(function (values) {
-            var _errors = _.filter(values, _.isError);
-            if (_.some(_errors)) {
-                console.log('The following errors occured when pushing ICWS data: ' + _.map(_errors, _.toString).join(', '));
-            }
-
-            // If there are only errors, it failed completely
-            if (_errors.length === values.length) {
-                console.log('Failed to push any ICWS data to Power BI');
-                return Promise.reject(new Error('Failed to push ICWS data to Power BI'));
-            }
-
-            PushedPowerBi.findAndUpdate(
-                function (item) { return _.find(data.weekly, { id: item.id }); },
-                function (item) { return _.assign(item, { isPushed: true }); }
-            );
-
-            return resolve(_.filter(values, function (value) { return !_.isError(value); }));
-        })
-        .catch(function (err) {
-            console.log('Failed to push ICWS data to Power BI: ' + err.toString());
-
-            return toPowerBi(data, powerBi, attempt += 1);
         });
+
+        return icwsUtils.settle(_promises);
+    })
+    .then(function (values) {
+        var _errors = _.filter(values, _.isError);
+        if (_.some(_errors)) {
+            console.log('The following errors occured when pushing ICWS data: ' + _.map(_errors, _.toString).join(', '));
+        }
+
+        // If there are only errors, it failed completely
+        if (_errors.length === values.length) {
+            console.log('Failed to push any ICWS data to Power BI');
+            return Promise.reject(new Error('Failed to push ICWS data to Power BI'));
+        }
+
+        PushedPowerBi.findAndUpdate(
+            function (item) { return _.find(data.weekly, { id: item.id }); },
+            function (item) { return _.assign(item, { isPushed: true }); }
+        );
+
+        return Promise.resolve(_.filter(values, function (value) { return !_.isError(value); }));
+    })
+    .catch(function (err) {
+        console.log('Failed to push ICWS data to Power BI: ' + err.toString());
+
+        return toPowerBi(data, powerBi, attempt += 1);
     });
 }
 
