@@ -1,5 +1,5 @@
 'use strict'
 
-function name(params) {
+module.exports = {
 
 }

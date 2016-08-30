@@ -59,6 +59,8 @@ function watch(dataArr) {
         // Call the function if it's defined
         if (_.isFunction(watchers[key])) { watchers[key](val); }
     });
+
+    pushChanges();
 }
 
 /**
@@ -195,9 +197,6 @@ function updateStatuses(data) {
             // Apply updates
             _agent = _.assign(_agent, user, _updates);
             Agents.update(_agent);
-
-            // Update or set the user in RethinkDB.
-            icwsDb.setAgent(_agent);
         }
     });
 
@@ -205,6 +204,36 @@ function updateStatuses(data) {
     if (_.some(_statUsers)) {
         icwsData.updateAgentInfo();
     }
+}
+
+/**
+ * Pushes any changes to the RethinkDB instance.
+ */
+function pushChanges() {
+    _.chain(Agents.getChanges())
+        .groupBy('obj.id')
+        // Get only one of the objects
+        .map(function (items) {
+            // If there's only a single object, return it
+            if (items.count === 1) {
+                return items[0];
+            }
+
+            // Return either the deleted item or the first item.
+            return _.some(items, { operation: 'R' })
+                ? _.find(items, { operation: 'R' })
+                : items[0];
+        })
+        .forEach(function (item) {
+            // If the interaction was removed, disable it in the DB.
+            // Otherwise find it and update or insert it
+            var _agent = item.operation !== 'R'
+                ? Agents.findOne({ id: item.obj.id })
+                : _.assign({}, item.obj, { isDisabled: true });
+
+            icwsDb.setAgent(_agent, true);
+        })
+        .value();
 }
 
 /**
