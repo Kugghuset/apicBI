@@ -299,7 +299,7 @@ function updateCalculatedValues(interaction, index) {
     // Replace the item in the list.
     __activeInteractions.splice(index, 1, _updated);
 
-    var _isUpdated = !icwsUtils.objectEquals(_storedInteraction,  _.assign(_storedInteraction, _updated));
+    var _isUpdated = !icwsUtils.objectEquals(_storedInteraction,  _.assign({}, _storedInteraction, _updated));
 
     // If there's been an update and there's an object in the DB, push it.
     if (_storedInteraction && _isUpdated) {
@@ -334,19 +334,34 @@ function storeInteraction(interaction) {
 }
 
 /**
- * Pushes any changes
+ * Pushes any changes to the RethinkDB instance.
  */
 function pushChanges() {
-    Interactions.getChanges()
-    .forEach(function (item) {
-        // If the interaction was removed, disable it in the DB.
-        // Otherwise find it and update or insert it
-        var _interaction = item.operation !== 'R'
-            ? item.obj
-            : _.assign({}, item.obj, { isDisabled: true });
+    _.chain(Interactions.getChanges())
+        // Group by id to filter out objects with multiple updates
+        .groupBy('obj.id')
+        // Get only one of the objects
+        .map(function (items) {
+            // If there's only a single object, return it
+            if (items.count === 1) {
+                return items[0];
+            }
 
-        icwsDb.setInteraction(_interaction, true);
-    });
+            // Return either the deleted item or the first item.
+            return _.some(items, { operation: 'R' })
+                ? _.find(items, { operation: 'R' })
+                : items[0];
+        })
+        .forEach(function (item) {
+            // If the interaction was removed, disable it in the DB.
+            // Otherwise find it and update or insert it
+            var _interaction = item.operation !== 'R'
+                ? Interactions.findOne({ id: item.obj.id })
+                : _.assign({}, item.obj, { isDisabled: true });
+
+            icwsDb.setInteraction(_interaction, true);
+        })
+        .value();
 
     // Clear the changes for Interactions
     Interactions.flushChanges();

@@ -32,13 +32,6 @@ var schema = {
     isCurrent: Boolean,
 };
 
-function listen(callback) {
-    Agent.changes().run(db.conn(), function (err, cursor) {
-        if (err) { callback(err); }
-        else { cursor.each(callback); }
-    });
-}
-
 /**
  * Initializes the agent table in the DB.
  *
@@ -56,4 +49,4 @@ function init() {
     });
 }
 
-module.exports = _.assign(Agent, { init: init, listen: listen });
+module.exports = _.assign(Agent, { init: init });

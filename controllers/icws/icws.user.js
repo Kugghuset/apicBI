@@ -186,15 +186,15 @@ function updateStatuses(data) {
             _user = _.assign(_user, user, _updates);
         }
 
-        var _isUpdated = !icwsUtils.objectEquals(_agent, _.assign(_agent, user, _updates));
+        var _updated = _.assign({}, user, _updated);
+
+        var _isUpdated = !icwsUtils.objectEquals(_agent, _.assign({}, _agent, _updated));
 
         // If there is a user and a persisted user.
         if (_agent && _isUpdated) {
             // Apply updates
             _agent = _.assign(_agent, user, _updates);
             Agents.update(_agent);
-
-            console.log('Setting agents')
 
             // Update or set the user in RethinkDB.
             icwsDb.setAgent(_agent);
