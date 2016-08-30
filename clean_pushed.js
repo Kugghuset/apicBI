@@ -1,7 +1,5 @@
 'use strict'
 
-var config = require('./configs/database');
-
 var _ = require('lodash');
 var Promise = require('bluebird');
 var fs = require('fs');
@@ -32,9 +30,12 @@ function onLoaded(err) {
 
         PushedPowerBi.removeWhere(function () { return true; });
 
-        console.log('PushedPowerBi cleaned, no data in db');
+        _storage.saveDatabase(function (err) {
+            if (err) { console.log(err); }
+            console.log('PushedPowerBi cleaned, no data in db');
 
-        process.exit();
+            process.exit();
+        });
     }
 }
 
