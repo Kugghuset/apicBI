@@ -4,6 +4,8 @@ env('./.env');
 
 var _ = require('lodash');
 
+var config = require('./configs/database');
+
 var ArgValues = require('./lib/argValues');
 var AzureAuth = require('./lib/azureAuth');
 var PowerBi = require('./lib/powerBi');
@@ -22,9 +24,13 @@ function printError(err) {
 var azure = new AzureAuth();
 
 new ArgValues(['dataset']).then(function(args) {
+    var _dataset = /icws/i.test(args.dataset)
+        ? config.dataset_icws
+        : config.dataset;
+
     azure.getToken().then(function(data) {
         var powerBi = new PowerBi(data.token);
-        powerBi.listTables(args.dataset, false).then(function(result) {
+        powerBi.listTables(_dataset, false).then(function(result) {
             for(var a = 0; a < result.tables.length; a++) {
                 powerBi.clearTable(result.dataset.id, result.tables[a].name).then(function(result) {
                     console.log(result);
