@@ -49,3 +49,4 @@ icws_auth.*
 tsd.json
 assets/icws
 assets/icws-storage.json
+rethinkdb_data
