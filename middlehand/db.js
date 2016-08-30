@@ -83,6 +83,10 @@ function init(context) {
     })
 }
 
+function toArray(cursor) {
+    return cursor.toArray;
+}
+
 module.exports = {
     conn: function () { return _conn; },
     setConnection: function (value) { _conn = value;  },
@@ -93,4 +97,5 @@ module.exports = {
     on: _eventer.on,
     off: _eventer.off,
     trigger: _eventer.trigger,
+    toArray: toArray,
 }
