@@ -62,7 +62,7 @@ function pickData(item) {
             'isAbandoned',
             'isCompleted',
         ])
-        .map(function (val, key) { return { name: key, value: !!val ? 1 : 0 }; })
+        .map(function (val, key) { return { name: key, value: !!val ? 100 : 0 }; })
         .value();
 
     return _.chain([])
