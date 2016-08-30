@@ -6,6 +6,7 @@ env('./.env');
 var express = require('express');
 var path = require('path');
 
+var config = require('./configs/database');
 var icwsCtrl = require('./controllers/icwsController');
 var utils = require('./lib/utils');
 var icws = require('./lib/icwsModule');
@@ -46,11 +47,16 @@ router.get('/api/queue-info', function (req, res) {
 
 app.use(router);
 
-var server = app.listen(5000, 'localhost', function () {
-    var host = server.address().address;
-    var port = server.address().port;
+if (config.icws_app_server) {
+  var server = app.listen(config.icws_app_port, 'localhost', function () {
+      var host = server.address().address;
+      var port = server.address().port;
 
-    console.log('App listening on %s on port %s', host, port);
+      console.log('App listening on %s on port %s', host, port);
 
-    icwsCtrl.run();
-});
+      icwsCtrl.run();
+  });
+
+} else {
+  icwsCtrl.run();
+}
