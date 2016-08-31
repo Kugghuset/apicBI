@@ -4,8 +4,44 @@ var $ = require('jquery');
 var _ = require('lodash');
 var Vue = require('vue');
 var Pusher = require('pusher-js');
+var moment = require('moment');
+
+window.jQuery = window.$ = $;
+window.Pusher = Pusher;
 
 var config = require('./config');
+
+Vue.filter('date', function (val, format) {
+  return !!val
+    ? moment(val).format(format)
+    : val;
+});
+
+Vue.filter('timer', function (val, type) {
+    var _divider = type === 'ms'
+        ? 1000
+        : 1;
+
+    var isNegative = val < 0;
+
+    if (isNegative) {
+        val = Math.abs(val);
+    }
+
+    var seconds = Math.floor(val);
+    var minutes = Math.floor(val / 60);
+    var hours = Math.floor(val / 60 / 60);
+    // var days = Math.floor(ms /  1000 / 60 / 60 / 24);
+
+    return (isNegative ? '-' : '') + [
+        ('0' + hours % 24).slice(-2),
+        ':',
+        ('0' + minutes % 60).slice(-2),
+        ':',
+        ('0' + seconds % 60).slice(-2),
+    ].join('');
+
+})
 
 var __divTemplate = '<div id="{id}"></div>'
 

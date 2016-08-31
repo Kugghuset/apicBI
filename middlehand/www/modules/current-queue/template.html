@@ -1,3 +1,6 @@
 <div class="module __current-queue">
-    <h1>{{ stats | json }}</h1>
+    <h1>CSA current queue time {{ stats.csa.queueTime | timer }}</h1>
+    <h1>CSA current queue length {{ stats.csa.queueLength }}</h1>
+    <h1>Partner service current queue time {{ stats.partnerService.queueTime | timer }}</h1>
+    <h1>Partner service current queue length {{ stats.partnerService.queueLength }}</h1>
 </div>
