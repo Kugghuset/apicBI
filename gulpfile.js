@@ -27,15 +27,14 @@ gulp.task('reload', function () {
 });
 
 gulp.task('watch', function () {
-    livereload.listen();
-    gulp.watch(['./www/**'], ['reload']);
+    // gulp.watch(['./www/**'], ['reload']);
     // gulp.watch(['./controllers/**', './libs/**'], ['serve:icws']);
 });
 
 gulp.task('serve:middlehand', function () {
     if (_node) { _node.kill(); }
 
-    _node = spawn('node', ['middlehand/app.js'], { stdio: 'inherit' });
+    _node = spawn('node', ['middlehand/server.js'], { stdio: 'inherit' });
 
     _node.on('close', function (code) {
         if (code === 8) {
@@ -44,10 +43,16 @@ gulp.task('serve:middlehand', function () {
     });
 });
 
-gulp.task('watch:middlehand', function () {
-    gulp.watch(['./middlehand/**'], ['serve:middlehand']);
+gulp.task('build:middlehand', function () {
+    shell.exec('npm run build:modules');
 });
 
-gulp.task('middlehand', ['watch:middlehand', 'serve:middlehand']);
+gulp.task('watch:middlehand', function () {
+    livereload.listen();
+    gulp.watch(['./middlehand/**', '!./middlehand/www'], ['serve:middlehand']);
+    gulp.watch(['./middlehand/www/**', '!./middlehand/www/.bin'], ['build:middlehand', 'reload']);
+});
+
+gulp.task('middlehand', ['build:middlehand', 'watch:middlehand', 'serve:middlehand']);
 
 gulp.task('default', ['watch', 'serve:icws', 'reload']);
