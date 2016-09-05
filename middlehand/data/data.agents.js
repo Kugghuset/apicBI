@@ -98,7 +98,7 @@ function getAgentStat(queueName) {
 
     return {
         agentCount: _agents.length,
-        availableAgentCount: _agents.filter(isAvailable).length,
+        availableAgentCount: _agents.filter(function (agent) { return isAvailable(agent, queueName); }).length,
     };
 }
 
@@ -108,6 +108,10 @@ function getAgentStat(queueName) {
  * @return {Boolean}
  */
 function hasWorkgroupsSpecial(agent, workgroups) {
+    if (_.isUndefined(workgroups)) {
+        return true;
+    }
+
     var _workgroups = _.isArray(workgroups)
         ? workgroups
         : [ workgroups ];
@@ -128,6 +132,11 @@ function hasWorkgroupsSpecial(agent, workgroups) {
     if (_.every(_cases)) {
         return false;
     }
+
+    console.log(agent)
+    console.log('---')
+    console.log(workgroups)
+    console.log('\n\n\n')
 
     return hasWorkgroups(agent, _workgroups);
 }
