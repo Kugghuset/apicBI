@@ -168,7 +168,13 @@ function updateStatuses(data) {
     // Update all users
     _.forEach(_statUsers, function (user) {
         // Find the user to update
-        var _user = _.find(_users, { id: user.id });
+        var _user = _.find(_users, function (u) { return _.toString(u.id) === _.toString(user.id); });
+
+        if (!_user) {
+            console.log('Failed to find user.')
+            console.log(JSON.stringify(user, null, 4));
+            console.log('\n\n\n')
+        }
 
         // Find the persisted user
         var _agent = Agents.findOne({ id: _.toString(user.id) });
