@@ -133,11 +133,6 @@ function hasWorkgroupsSpecial(agent, workgroups) {
         return false;
     }
 
-    console.log(agent)
-    console.log('---')
-    console.log(workgroups)
-    console.log('\n\n\n')
-
     return hasWorkgroups(agent, _workgroups);
 }
 
