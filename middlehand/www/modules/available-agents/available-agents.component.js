@@ -21,8 +21,19 @@ new Vue({
                 csa: { agentCount: 0, availableAgentCount: 0 },
                 partnerService:  { agentCount: 0, availableAgentCount: 0 },
                 total: { agentCount: 0, availableAgentCount: 0 },
-            }
+            },
+            workgroup: common.getWorkgroup(),
+            statType: common.getStatType(),
+            isDebug: common.getDebug(),
         };
+    },
+    computed: {
+        _value: function () {
+            var _wg = /partner/i.test(this.workgroup) ? 'partnerService' : 'csa';
+            var _type = /^agentCount$/i.test(this.statType) ? 'agentCount' : 'availableAgentCount';
+
+            return !!this.stats[_wg] ? this.stats[_wg][_type] : '';
+        },
     },
     methods: {
         fetchStats: function () {
@@ -38,6 +49,7 @@ new Vue({
         this.fetchStats();
 
         common.listen('dev', 'agent-stats', this.setStats);
+        common.initFlowtype(document.body);
     },
 });
 

@@ -1,12 +1,19 @@
 'use strict'
 
-var $ = require('jquery');
+require('./../style/main.scss');
+
+var $ = window.jQuery = window.$ = require('jquery');
+
 var _ = require('lodash');
 var Vue = require('vue');
 var Pusher = require('pusher-js');
 var moment = require('moment');
 
-window.jQuery = window.$ = $;
+require('./../../../lib/flowtype');
+
+function flowtype (el, opts) {
+    return $(el).flowtype(opts);
+}
 window.Pusher = Pusher;
 
 var config = require('./config');
@@ -206,8 +213,45 @@ var http = {
     delete: function (url, options, dataOnly) { return _request('DELETE', url, null, options, dataOnly); },
 };
 
+/**
+ * @return {String}
+ */
+function getWorkgroup() {
+    return window.workgroup;
+}
+
+/**
+ * @return {String}
+ */
+function getStatType() {
+    return window.statType;
+}
+
+/**
+ * @return {String}
+ */
+function getDebug() {
+    return window.debug;
+}
+
+/**
+ * @param {Element} el
+ */
+function initFlowtype(el) {
+    flowtype(el, {
+        minWidth: '230px',
+        maxWidth: '800px',
+        min: 36,
+        max: 70,
+    });
+}
+
 module.exports = {
     addDiv: addDiv,
     http: http,
     listen: listen,
+    getWorkgroup: getWorkgroup,
+    getStatType: getStatType,
+    getDebug: getDebug,
+    initFlowtype: initFlowtype,
 }

@@ -1,7 +1,4 @@
 <div class="module __available-agents">
-    <h1>CSA available agents {{ stats.csa.availableAgentCount }}</h1>
-    <h1>CSA total agents {{ stats.csa.agentCount }}</h1>
-    <h1>Partner Service available agents {{ stats.partnerService.availableAgentCount }}</h1>
-    <h1>Partner Service total agents {{ stats.partnerService.agentCount }}</h1>
+    <h1>{{ _value }}</h1>
+    <pre v-show="isDebug">{{ _data | json }}</pre>
 </div>
-<hr>
