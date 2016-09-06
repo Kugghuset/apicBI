@@ -1,8 +1,16 @@
+'use strict'
+
+if (!process.env.APP_NAME) {
+    process.env.APP_NAME = 'utility';
+}
+
 var Promise = require('bluebird');
 var AzureAuth = require('../lib/azureAuth');
 var PowerBi = require('../lib/powerBi');
 var env = require('node-env-file');
 env('./.env');
+
+var logger = require('./../middlehand/logger');
 
 var config = require('./../configs/database');
 
@@ -23,12 +31,12 @@ ClearTable.run = function(table) {
         var powerBi = new PowerBi(data.token);
         powerBi.datasetExists(_dataset).then(function(result) {
             powerBi.clearTable(result.dataset.id, table).then(function(result) {
-                console.log(result);
+                logger.log('Table cleared', 'info', result);
             }).catch(function(error) {
-                console.log(error);
+                logger.log('Failed to clear table', 'error', { error: err.toStrring(), tableId: result.dataset.id });
             });
-        }).catch(function(error) { console.log(error); });
-    }).catch(function(error) { console.log(error); });
+        }).catch(function(error) { logger.log('Failed to clear tables', 'error', { error: err.toStrring() }); });
+    }).catch(function(error) { logger.log('Failed to clear tables', 'error', { error: err.toStrring() }); });
 }
 
 module.exports = ClearTable;

@@ -4,6 +4,7 @@ var r = require('rethinkdb');
 
 var config = require('./config');
 var utils = require('./utils');
+var logger = require('./logger');
 
 var Eventer = require('tiny-eventer').Eventer;
 var _eventer = new Eventer();
@@ -16,20 +17,20 @@ var _conn = null;
  * @return {Promise}
  */
 function initDb(name) {
-    r.dbList().run(_conn)
+    return r.dbList().run(_conn)
     .then(function (dbs) {
         // If the db name already exists, use it and resolve
         if (utils.contains(dbs, name)) {
-            console.log('Existing db: ' + name);
+            logger.log('Not creating DB, it exists already', 'info', { name: name });
             return Promise.resolve();
         }
 
-        console.log('Creating db: ' + name);
+        logger.log('Creating DB' + { name: name });
         return r.dbCreate(name).run(_conn);
     })
     .then(function (output) {
         if (output) {
-            console.log('Created db: ' + name);
+            logger.log('DB created' + name);
             // Use the created db and resolve
         }
 
@@ -46,18 +47,18 @@ function initTable(name, options) {
     return r.db(config.db).tableList().run(_conn)
     .then(function (tables) {
         if (utils.contains(tables, name)) {
-            console.log('Not creating table, already exists: ' + name);
+            logger.log('Not creating table, it already exists', 'info', { name: name });
             return Promise.resolve();
         }
 
         options = typeof options !== 'undefined' ? options : {};
 
-        console.log('Creating table: ' + name);
+        logger.log('Creating table', 'info', { name: name });
         return r.db(config.db).tableCreate(name, options).run(_conn);
     })
     .then(function (output) {
         if (output) {
-            console.log('Table created: ' + name);
+            logger.log('Table created', 'info', { name: name });
         }
 
         return Promise.resolve();
@@ -69,7 +70,7 @@ function initTable(name, options) {
  * @return {Promise}
  */
 function init(context) {
-    return r.connect({ host: config.host, port: config.port })
+    return r.connect({ host: config.db_host, port: config.db_port, user: config.db_user, password: config.db_password })
     .then(function (connection) {
         _conn = connection;
 
@@ -83,7 +84,12 @@ function init(context) {
     })
 }
 
+function toArray(cursor) {
+    return cursor.toArray;
+}
+
 module.exports = {
+    r: r,
     conn: function () { return _conn; },
     setConnection: function (value) { _conn = value;  },
     initDb: initDb,
@@ -93,4 +99,5 @@ module.exports = {
     on: _eventer.on,
     off: _eventer.off,
     trigger: _eventer.trigger,
+    toArray: toArray,
 }

@@ -10,6 +10,9 @@ var icws = require('../../lib/icwsModule');
 var icwsStorage = require('./icws.storage');
 var icwsUtils = require('./icws.utils');
 var icwsPush = require('./icws.push');
+var icwsDb = require('./icws.db');
+
+var logger = require('./../../middlehand/logger');
 
 /** @type {LokiCollection<{}>} */
 var Interactions = icwsStorage.getCollection('interactions');
@@ -410,7 +413,11 @@ function initCurrentAgentView(view) {
  */
 function setup() {
     Interactions = icwsStorage.getCollection('interactions');
+    Interactions.setChangesApi(true);
+
     Agents = icwsStorage.getCollection('agents');
+    Agents.setChangesApi(true);
+
     PushedPowerBi = icwsStorage.getCollection('pushedPowerBi');
 
     TimeDiffView = icwsStorage.getView(Interactions, 'timeDiffView', initTimeDiffView);
@@ -429,6 +436,7 @@ function setup() {
         return _.assign(item, { isCurrent: false, });
     });
 
+    // Get all interactions which aren't pushed.
     var unPushed = Interactions.where(function (interaction) {
         // Get only not pushed interactions
         return _.every([
@@ -438,12 +446,13 @@ function setup() {
         ]);
     });
 
+    // Insert all non-pushed items and push them.
     PushedPowerBi.insert(unPushed.map(function (interaction) { return { id: interaction.id, dateAdded: Date.now(), isPushed: false }; }));
     icwsPush.toPowerBi({ daily: unPushed.filter(icwsUtils.isToday), weekly: unPushed.filter(icwsUtils.isThisWeek) })
     .then(function (data) {
-        console.log('Pushed ICWS data to power BI');
+        logger.log('Pushed ICWS data to power BI', 'info', { dailyCount: unPushed.filter(icwsUtils.isToday).length, weeklyCount: unPushed.filter(icwsUtils.isThisWeek).length });
     })
-    .catch(function (err) { console.log(err); console.log(err.trace); });
+    .catch(function (err) { logger.log('Failed to push ICWS data to PowerBI', 'error', { error: _.isError(err) ? err.toString() : err }); });
 
     // update the time diff
     updateTimeDiff()

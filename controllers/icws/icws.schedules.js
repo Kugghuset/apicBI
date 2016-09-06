@@ -4,6 +4,8 @@ var _ = require('lodash');
 var moment = require('moment');
 var later = require('later');
 
+var logger = require('./../../middlehand/logger');
+
 /**
  * @type {{ type: String, interval: { isDone: Function, clear: Function } }[]}
  */
@@ -31,7 +33,7 @@ function _callFn(fn) { return fn(); }
  * @param {String} type
  */
 function _call(type) {
-    console.log('Scheduled event for ' + type + ' at ' + moment().format('YYYY-MM-DD HH:mm:ss'));
+    logger.log('Scheduled event', 'info', { type: type });
 
     // Call all callable callbacks
     _.chain(_schedules[type])
@@ -79,7 +81,7 @@ function startInterval(type, schedule) {
         interval: later.setInterval(function () { return _call(type); }, schedule),
     });
 
-    console.log('Starting the {type} interval schedule'.replace('{type}', type));
+    logger.log('Starting schedule', 'info', { type: type });
 
     // Return the added interval
     return _intervals[_length - 1];
@@ -115,7 +117,7 @@ function setWeekly(id, callback) {
         callback: callback,
     });
 
-    console.log('Added weekly schedule: ' + id);
+    logger.log('Added weekly schedule', 'info', { id: id });
 
     // return the added object
     return getSchedule('weekly', id);
@@ -155,7 +157,7 @@ function setDaily(id, callback) {
         callback: callback,
     });
 
-    console.log('Added daily schedule: ' + id);
+    logger.log('Added daily schedule', 'info', { id: id });
 
     // return the added object
     return getSchedule('daily', id);

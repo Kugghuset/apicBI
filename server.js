@@ -1,6 +1,12 @@
+'use strict'
+
+process.env.APP_NAME = 'ApicBI'
+
 var env = require('node-env-file');
 var later = require('later');
 env('./.env');
+
+var logger = require('./middlehand/logger');
 
 var DB2BI = require('./controllers/db2bi');
 var ClearTable = require('./controllers/clearTable');
@@ -19,7 +25,7 @@ var everyStartOfWeek = later.parse.recur()
     .on(2).dayOfWeek()
     .first().hour();
 
-console.log('Running schedules, waiting for updates...');
+logger.log('Running schedules, waiting for updates...');
 // Regular update
 later.setInterval(DB2BI.read, every10Seconds);
 // Instantly call the read method

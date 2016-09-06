@@ -6,6 +6,10 @@ var Promise = require('bluebird');
 var icwsSub = require('./icws.sub');
 var icwsStorage = require('./icws.storage');
 var icwsData = require('./icws.data');
+var icwsUtils = require('./icws.utils');
+var icwsDb = require('./icws.db');
+
+var logger = require('./../../middlehand/logger');
 
 var config = require('./../../configs/database');
 
@@ -57,6 +61,8 @@ function watch(dataArr) {
         // Call the function if it's defined
         if (_.isFunction(watchers[key])) { watchers[key](val); }
     });
+
+    pushChanges();
 }
 
 /**
@@ -107,7 +113,7 @@ function updateUsers(data) {
             .thru(function (users) { return users.concat(_added, _changed); })
             .value();
 
-        console.log('There are now {num} users!'.replace('{num}', _users.length));
+        logger.log('Users updated', 'info', { userCount: _users.lengh });
 
         // Get the ids to added users and, if any, subscribe to their statuses
         var _addedIds = _.map(_added, 'id');
@@ -119,11 +125,13 @@ function updateUsers(data) {
         _.forEach(_added.concat(_changed), function (user) {
             var _agent = Agents.findOne({ id: _.toString(user.id) });
 
-            if (_agent) {
+            var _isUpdated = !icwsUtils.objectEquals(_agent, _.assign({}, _agent, user));
+
+            if (_agent && _isUpdated) {
                 // There's an existing user, update it
                 _agent = _.assign(_agent, user);
                 Agents.update(_agent);
-            } else {
+            } else if (!_agent) {
                 // Insert the new user!
                 Agents.insert(user);
             }
@@ -134,7 +142,7 @@ function updateUsers(data) {
             Agents.findAndUpdate(function (agent) {
                 return !!_.find(_removed, { configuration: { id: agent.id } });
             }, function (agent) {
-                return _.assign(agent, { isCurrent: true });
+                return _.assign(agent, { isCurrent: false });
             });
 
             userStatusSub('unsubscribe', _removed);
@@ -164,7 +172,11 @@ function updateStatuses(data) {
     // Update all users
     _.forEach(_statUsers, function (user) {
         // Find the user to update
-        var _user = _.find(_users, { id: user.id });
+        var _user = _.find(_users, function (u) { return _.toString(u.id) === _.toString(user.id); });
+
+        if (!_user) {
+            utils.log('Failed to find user to update status', 'error', user);
+        }
 
         // Find the persisted user
         var _agent = Agents.findOne({ id: _.toString(user.id) });
@@ -184,8 +196,12 @@ function updateStatuses(data) {
             _user = _.assign(_user, user, _updates);
         }
 
+        var _updated = _.assign({}, user, _updated);
+
+        var _isUpdated = !icwsUtils.objectEquals(_agent, _.assign({}, _agent, _updated));
+
         // If there is a user and a persisted user.
-        if (_agent) {
+        if (_agent && _isUpdated) {
             // Apply updates
             _agent = _.assign(_agent, user, _updates);
             Agents.update(_agent);
@@ -196,6 +212,39 @@ function updateStatuses(data) {
     if (_.some(_statUsers)) {
         icwsData.updateAgentInfo();
     }
+}
+
+/**
+ * Pushes any changes to the RethinkDB instance.
+ */
+function pushChanges() {
+    _.chain(Agents.getChanges())
+        .groupBy('obj.id')
+        // Get only one of the objects
+        .map(function (items) {
+            // If there's only a single object, return it
+            if (items.count === 1) {
+                return items[0];
+            }
+
+            // Return either the deleted item or the first item.
+            return _.some(items, { operation: 'R' })
+                ? _.find(items, { operation: 'R' })
+                : items[0];
+        })
+        .forEach(function (item) {
+            // If the interaction was removed, disable it in the DB.
+            // Otherwise find it and update or insert it
+            var _agent = item.operation !== 'R'
+                ? Agents.findOne({ id: item.obj.id })
+                : _.assign({}, item.obj, { isDisabled: true });
+
+            icwsDb.setAgent(_agent, true);
+        })
+        .value();
+
+    // Clear the changes
+    Agents.flushChanges();
 }
 
 /**
@@ -231,7 +280,7 @@ function userListSub(action, subId) {
     var path = 'messaging/subscriptions/configuration/users/:id'
         .replace(':id', subId);
 
-    console.log('Subscribing to the list of user in configurations/users');
+    logger.log('Subscribing to the list of user in configurations/users');
 
     return /unsub/i.test(action)
         ? icwsSub.unsubscribe(path)
@@ -263,7 +312,7 @@ function userStatusSub(action, users) {
 
     var subPath = 'messaging/subscriptions/status/user-statuses';
 
-    console.log('Subscribing to {num} users\' statuses.'.replace('{num}', users.length));
+    logger.log('Subscribing to users\' statuses.', 'info', { userCount: users.length });
 
     return /unsub/i.test(action)
         ? icwsSub.unsubscribe(subPath)

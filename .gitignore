@@ -1,5 +1,6 @@
 # Logs
 logs
+.logs
 *.log
 npm-debug.log*
 
@@ -35,6 +36,7 @@ node_modules
 
 # Environment data
 .env
+.env-middlehand
 
 # PhpStorm
 .idea
@@ -49,4 +51,5 @@ icws_auth.*
 tsd.json
 assets/icws
 assets/icws-storage.json
-rethinkdb_data
+rethinkdb_data/
+.bin

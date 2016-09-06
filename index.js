@@ -1,5 +1,7 @@
 'use strict'
 
+process.env.APP_NAME = 'Apic_ICWS';
+
 var env = require('node-env-file');
 env('./.env');
 
@@ -10,6 +12,7 @@ var config = require('./configs/database');
 var icwsCtrl = require('./controllers/icwsController');
 var utils = require('./lib/utils');
 var icws = require('./lib/icwsModule');
+var logger = require('./middlehand/logger');
 
 var app = express();
 var root = path.resolve();
@@ -52,7 +55,7 @@ if (config.icws_app_server) {
       var host = server.address().address;
       var port = server.address().port;
 
-      console.log('App listening on %s on port %s', host, port);
+      logger.log('App listening on ' + host + ' on port ' + port);
 
       icwsCtrl.run();
   });
