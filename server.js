@@ -1,3 +1,7 @@
+'use strict'
+
+process.env.APP_NAME = 'ApicBI'
+
 var env = require('node-env-file');
 var later = require('later');
 env('./.env');

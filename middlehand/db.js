@@ -4,6 +4,7 @@ var r = require('rethinkdb');
 
 var config = require('./config');
 var utils = require('./utils');
+var logger = require('./logger');
 
 var Eventer = require('tiny-eventer').Eventer;
 var _eventer = new Eventer();
@@ -20,16 +21,16 @@ function initDb(name) {
     .then(function (dbs) {
         // If the db name already exists, use it and resolve
         if (utils.contains(dbs, name)) {
-            console.log('Existing db: ' + name);
+            logger.log('Not creating DB, it exists already', 'info', { name: name });
             return Promise.resolve();
         }
 
-        console.log('Creating db: ' + name);
+        logger.log('Creating DB' + { name: name });
         return r.dbCreate(name).run(_conn);
     })
     .then(function (output) {
         if (output) {
-            console.log('Created db: ' + name);
+            logger.log('DB created' + name);
             // Use the created db and resolve
         }
 
@@ -46,18 +47,18 @@ function initTable(name, options) {
     return r.db(config.db).tableList().run(_conn)
     .then(function (tables) {
         if (utils.contains(tables, name)) {
-            console.log('Not creating table, already exists: ' + name);
+            logger.log('Not creating table, it already exists', 'info', { name: name });
             return Promise.resolve();
         }
 
         options = typeof options !== 'undefined' ? options : {};
 
-        console.log('Creating table: ' + name);
+        logger.log('Creating table', 'info', { name: name });
         return r.db(config.db).tableCreate(name, options).run(_conn);
     })
     .then(function (output) {
         if (output) {
-            console.log('Table created: ' + name);
+            logger.log('Table created', 'info', { name: name });
         }
 
         return Promise.resolve();

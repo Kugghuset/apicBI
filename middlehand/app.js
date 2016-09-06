@@ -1,5 +1,7 @@
 'use strict'
 
+process.env.APP_NAME = 'ApicBI_Middlehand';
+
 var _ = require('lodash');
 var r = require('rethinkdb');
 var Promise = require('bluebird');
@@ -8,6 +10,7 @@ var path = require('path');
 var exphbs = require('express-handlebars');
 var express = require('express');
 
+var logger = require('./logger');
 var db = require('./db');
 var config = require('./config');
 
@@ -42,7 +45,7 @@ db.init({ db: 'icws' })
     data.init();
 })
 .catch(function (err) {
-    console.log('Failed to start app: ' + err.toString());
+    logger.log('Failed to start app', 'error', { error: err.toString() });
 })
 
 function serve() {
@@ -50,7 +53,7 @@ function serve() {
         var host = server.address().address;
         var port = server.address().port;
 
-        console.log('App listening on %s on port %s', host, port);
+        logger.log('App listening on ' + host + ' on port ' + port);
     });
 
 }

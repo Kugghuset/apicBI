@@ -3,6 +3,8 @@
 var Promise = require('bluebird');
 var _ = require('lodash');
 
+var logger = require('./logger');
+
 /**
  * @param {Array} coll
  * @param {any} item
@@ -63,7 +65,7 @@ function setItem(coll, update) {
         var _index = _.findIndex(coll, { id: _old.id });
 
         if (_index < 0) {
-            console.log('Failed to find item: ' + _old.id);
+            logger.log('Failed to find item', 'info', { id: _old.id });
             return;
         }
 
@@ -72,7 +74,7 @@ function setItem(coll, update) {
         var _index = _.findIndex(coll, { id: _new.id });
 
         if (_index < 0) {
-            console.log('Failed to find item: ' + _new.id);
+            logger.log('Failed to find item', 'info', { id: _new.id });
             coll.push(_new);
             return;
         }

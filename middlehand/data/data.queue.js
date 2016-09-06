@@ -9,6 +9,7 @@ var _eventer = new Eventer();
 var db = require('./../db');
 var models = require('./../models/models');
 var utils = require('./../utils');
+var logger = require('./../logger');
 
 var Interaction = models.models.Interaction;
 
@@ -39,7 +40,7 @@ function listen() {
     .then(function (cursor) {
         cursor.each(function (err, update) {
             if (err) {
-                console.log(err);
+                logger.log('Failed to get cursor for changes', 'error', { name: 'CurrentQueue', error: err.toString() });
                 _eventer.trigger('error', err);
             } else {
                 // Update the queue
@@ -52,16 +53,7 @@ function listen() {
     })
     .catch(function (err) {
         _eventer.trigger('error', err);
-        console.log(err)
-    });
-
-    // Listen for updates
-    CurrentQueue
-    .changes()
-    .run(db.conn())
-
-    .catch(function (err) {
-        console.log(err);
+        logger.log('Failed to listen for changes', 'error', { name: 'CurrentQueue', error: err.toString() })
     });
 }
 

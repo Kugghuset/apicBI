@@ -3,6 +3,7 @@
 var _ = require('lodash');
 
 var db = require('./../db');
+var logger = require('./../logger');
 
 var Agent = db.table('agent');
 
@@ -40,11 +41,11 @@ var schema = {
 function init() {
     return db.initTable('agent', { primaryKey: '_id', })
     .then(function () {
-        console.log('agent table initialized.');
+        logger.log('Table initialized.', 'info', { name: 'agent' });
         return Promise.resolve();
     })
     .catch(function (err) {
-        console.log('Failed to initialize agent table: ' + err.toString());
+        logger.log('Failed to initialize table', 'error', { name: 'agent', error: err.toString() });
         return Promise.reject(err);
     });
 }

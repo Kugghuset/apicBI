@@ -4,8 +4,6 @@ var path = require('path');
 var env = require('node-env-file');
 env(path.resolve(__dirname, './../.env-middlehand'));
 
-// console.log(process.env)
-
 module.exports = {
     db: 'icws',
     db_port: 28015,

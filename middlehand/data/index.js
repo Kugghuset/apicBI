@@ -37,15 +37,6 @@ function init() {
     })
 }
 
-// dataQueue.onStatsUpdated(function (queueStats) {
-//     console.log('Queue stats updated:');
-//     console.log(JSON.stringify(queueStats, null, 4));
-// })
-
-// dataAgents.onStatsUpdated(function (agentsStats) {
-//     console.log('Agents stats updated:');
-//     console.log(JSON.stringify(agentsStats, null, 4));
-// })
 
 
 module.exports = {
