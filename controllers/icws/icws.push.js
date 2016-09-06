@@ -123,7 +123,7 @@ function toPowerBi(data, powerBi, attempt) {
             }
 
             if (!config.allow_push) {
-                logger.log('Won\'t push. Would have pushed ICWS data to Power BI.', 'info', { tableName: 'icws_agent_' + key, rowCoutn: value.length });
+                logger.log('Won\'t push. Would have pushed ICWS data to Power BI.', 'info', { tableName: 'icws_agent_' + key, rowCount: value.length });
                 return Promise.resolve({});
             }
 

@@ -170,7 +170,7 @@ function cleanDataset(recordset, lastUpdated) {
 
     // recordset will allways be the same or greater than todayOnly, so it's valid to only check it's length;
     if (recordset && recordset.length) {
-        logger.log('Found new data', 'info', { rowCoutn: recordset.length });
+        logger.log('Found new data', 'info', { rowCount: recordset.length });
 
         // Resolve the various recordsets
         return { recordset: recordset, todayOnly: todayOnly, latest: latest };
