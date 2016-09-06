@@ -1,8 +1,11 @@
+'use strict'
 
 var fs = require('fs');
 var path = require('path');
 var moment = require('moment');
 var _ = require('lodash');
+
+var logger = require('./../middlehand/logger');
 
 var azure = require('../lib/azure');
 var PowerBi = require('../lib/powerBi');
@@ -28,7 +31,7 @@ function saveTokenToFile(data) {
             : data.expiresOn
     });
 
-    console.log('Writing token file at {time}'.replace('{time}', moment().format('YYYY-MM-DD HH:mm:ss')));
+    logger.log('Writing token file', 'info', { _data });
 
     writeJsonFile(_tokenPath, _data);
 
@@ -141,12 +144,12 @@ function migrateTxtToJson(txtPath, jsonPath) {
     if (timestamp) {
 
         // Write to the new file.
-        console.log('Migrating .txt timestamp file: ' + _txtPath);
+        logger.log('Migrating .txt timestamp file', 'info', { filename: _txtPath, timestamp: timestamp, timeString: moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS') });
         writeJsonFile(jsonPath, { timestamp: timestamp, timeString: moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS') });
 
         // Delete the old file as it's unnecessary
         fs.unlinkSync(_txtPath);
-        console.log('.txt file deleted: ' + _txtPath);
+        logger.log('.txt file deleted', 'info', { filename: _txtPath });
     }
 
 }

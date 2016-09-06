@@ -20,6 +20,7 @@ var database = {
     dataset: process.env.DATASET || 'ApicBI',
     dataset_icws: process.env.DATASET_ICWS || 'ApicBI_ICWS',
     icws_sub_id: process.env.ICWS_SUB_ID || 'kugghuset-1',
+    allow_push: typeof process.env.ALLOW_PUSH === 'undefinend' ? false : parseBool(process.env.ALLOW_PUSH),
     tickety: {
         host: process.env.SQL_TICKETY_SERVER,
         database: process.env.SQL_TICKETY_DATABASE,

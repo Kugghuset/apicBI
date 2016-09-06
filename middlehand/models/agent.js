@@ -1,18 +1,11 @@
 'use strict'
 
+var _ = require('lodash');
+
 var db = require('./../db');
+var logger = require('./../logger');
 
 var Agent = db.table('agent');
-
-db.on('initialized', function () {
-    db.initTable('agent', { primaryKey: '_id', })
-    .then(function () {
-        console.log('agent table initialized.');
-    })
-    .catch(function (err) {
-        console.log('Failed to initialize agent table: ' + err.toString());
-    });
-});
 
 /**
  * @type {{ id: String, name: String, statusName: String, lastLocalChange: Date, workgroups: { id: String, name: String }[], isAvailableCsa: Boolean, isAvailablePartnerService: Boolean, loggedIn: Boolean, onPhone: Boolean, stations: String[], isCurrent: Boolean }}
@@ -40,4 +33,21 @@ var schema = {
     isCurrent: Boolean,
 };
 
-module.exports = Agent;
+/**
+ * Initializes the agent table in the DB.
+ *
+ * @return {Promise}
+ */
+function init() {
+    return db.initTable('agent', { primaryKey: '_id', })
+    .then(function () {
+        logger.log('Table initialized.', 'info', { name: 'agent' });
+        return Promise.resolve();
+    })
+    .catch(function (err) {
+        logger.log('Failed to initialize table', 'error', { name: 'agent', error: err.toString() });
+        return Promise.reject(err);
+    });
+}
+
+module.exports = _.assign(Agent, { init: init });

@@ -11,6 +11,10 @@ var icwsInteraction = require('./icws/icws.interaction');
 var icwsStorage = require('./icws/icws.storage');
 var icwsData = require('./icws/icws.data');
 var icwsPush = require('./icws/icws.push');
+var icwsDb = require('./icws/icws.db');
+var icwsUtils = require('./icws/icws.utils');
+
+var logger = require('./../middlehand/logger');
 
 /**
  * Polls the messaging route for new data
@@ -31,8 +35,7 @@ function poll() {
         icwsInteraction.watch(dataArr);
     })
     .catch(function (err) {
-        console.log('The following error occured when polling: ' + err.toString());
-        console.log(err.stack)
+        logger.log('An error occured when polling', 'error', { error: err.toString(), stackTrace: err.stack });
     })
 }
 
@@ -48,16 +51,10 @@ function poll() {
  * @return {Promise} -> {String} (Will be empty)
  */
 function setupSubscriptions() {
-    return new Promise(function (resolve, reject) {
+    var promises = [ icwsUser.setup(), icwsInteraction.setup(), icwsPush.setup(), ];
 
-        var promises = [ icwsUser.setup(), icwsInteraction.setup(), icwsPush.setup(), ];
-
-        Promise.all(_.map(promises, function (promise) { return promise.reflect(); }))
-        .then(function (data) {
-            resolve(_.map(data, function (val) { return val.isRejected() ? undefined : val.value(); }))
-        });
-
-    });
+    return icwsDb.init()
+    .then(function () { return icwsUtils.settle(promises); });
 }
 
 /**
@@ -73,10 +70,10 @@ function startPolling(ms) {
         : 1000;
 
     if (!_interval) {
-        console.log('Start polling ICWS server');
+        logger.log('Start polling ICWS server');
         _interval = setInterval(poll, ms)
     } else {
-        console.log('Polling already active.');
+        logger.log('Polling already active.');
     }
 
     return _interval;
@@ -90,10 +87,10 @@ function startPolling(ms) {
 function stopPolling() {
 
     if (_interval) {
-        console.log('Stop polling the ICWS server');
+        logger.log('Stop polling the ICWS server');
         clearInterval(_interval);
     } else {
-        console.log('Cannot stop polling, nothing to stop.');
+        logger.log('Cannot stop polling, nothing to stop.');
     }
 
     _interval = undefined;
@@ -153,8 +150,7 @@ function run() {
             resolve(icws);
         })
         .catch(function (err) {
-            console.log(err);
-            console.log(err.trace)
+            logger.log('Failed to properly run icws', 'error', { error: err.toString() });
             reject(err);
         })
 

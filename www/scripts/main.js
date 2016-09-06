@@ -10,7 +10,7 @@ Vue.filter('date', function (val, format) {
 
 var app = new Vue({
   el: '#app-mount',
-  data() {
+  data: function () {
     return {
       users: [],
       interactions: [],
@@ -24,12 +24,12 @@ var app = new Vue({
     };
   },
   computed: {
-    _availableUsers() {
+    _availableUsers: function () {
       return this.users.filter(this.isAvailable);
     }
   },
   methods: {
-    isAvailable(user) {
+    isAvailable: function (user) {
       return [
         user.loggedIn,
         !user.onPhone,
@@ -58,13 +58,12 @@ var app = new Vue({
       ].join('');
     },
     getWorkgroups: function (user) {
-      console.log(JSON.parse(JSON.stringify(user)))
       return user.workgroups.map(function (data) { return data.name }).join(', ');
     }
   },
-  ready() {
+  ready: function () {
     setInterval(function () {
-      this.$http.get('/api/resources')
+      this.$http.get('/api/resources?t=' + new Date().getTime())
       .then(
         function (response) {
 
@@ -84,7 +83,8 @@ var app = new Vue({
           this.queueInfo = response.data.queueInfo;
           this.userInfo = response.data.userInfo;
         }, function (err) {
-          console.log(err);
+
+          (err);
         }
       );
 

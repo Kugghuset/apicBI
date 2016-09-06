@@ -13,8 +13,10 @@ var icwsStorage = require('./icws.storage');
 var icwsUtils = require('./icws.utils');
 var icwsData = require('./icws.data');
 var icwsPush = require('./icws.push');
+var icwsDb = require('./icws.db');
 
 var config = require('./../../configs/database');
+var logger = require('./../../middlehand/logger');
 
 /** @type {LokiCollection<{}>} */
 var Interactions = icwsStorage.getCollection('interactions');
@@ -79,6 +81,8 @@ function watch(dataArr) {
     _.forEach(__activeInteractions, updateCalculatedValues);
 
     icwsData.updateQueueInfo();
+
+    pushChanges();
 }
 
 /**
@@ -160,7 +164,7 @@ function updateInteractions(data) {
             var _updated = Interactions.findOne({ id: _.toString(interaction.id) });
 
             if (_.isNull(_updated)) {
-                console.log('Failed to find interaction to update: ' + interaction.id);
+                logger.log('Failed to find interaction to update', 'info', { interactionId: interaction.id });
                 return;
             }
 
@@ -192,7 +196,7 @@ function updateInteractions(data) {
             var _updated = Interactions.findOne({ id: _.toString(removedId) });
 
             if (_.isNull(_updated)) {
-                console.log('Failed to remove interaction, could not find it: ' + removedId);
+                logger.log('Failed to remove interaction, could not find it', 'info', { interactionId: removedId });
                 return;
             }
 
@@ -241,7 +245,7 @@ function updateWorkstations(data) {
             .thru(function (workstations) { return workstations.concat(_added, _changed); })
             .value();
 
-        console.log('There are now {num} workstations!'.replace('{num}', __workstations.length));
+        logger.log('Workstations updated', 'info', { workstationCount: __workstations.length });
 
         // Get the ids to added workstations, if any, subscribe to their queues
         var _addedIds = _.map(_added, 'id');
@@ -296,7 +300,10 @@ function updateCalculatedValues(interaction, index) {
     // Replace the item in the list.
     __activeInteractions.splice(index, 1, _updated);
 
-    if (_storedInteraction) {
+    var _isUpdated = !icwsUtils.objectEquals(_storedInteraction,  _.assign({}, _storedInteraction, _updated));
+
+    // If there's been an update and there's an object in the DB, push it.
+    if (_storedInteraction && _isUpdated) {
         _storedInteraction = _.assign(_storedInteraction, _updated);
         storeInteraction(_storedInteraction);
     }
@@ -322,9 +329,43 @@ function storeInteraction(interaction) {
         .then(function (data) { /** Do something? */ })
         .catch(function (err) {
             // Must be caught, otherwise it might break stuff.
-            console.log('Something went wrong when pushing to Power BI: ' + err.toString());
+            logger.log('Failed to push data to PowerBI', 'error', { error: _.isError(err) ? err.toString() : err });
         });
     }
+}
+
+/**
+ * Pushes any changes to the RethinkDB instance.
+ */
+function pushChanges() {
+    _.chain(Interactions.getChanges())
+        // Group by id to filter out objects with multiple updates
+        .groupBy('obj.id')
+        // Get only one of the objects
+        .map(function (items) {
+            // If there's only a single object, return it
+            if (items.count === 1) {
+                return items[0];
+            }
+
+            // Return either the deleted item or the first item.
+            return _.some(items, { operation: 'R' })
+                ? _.find(items, { operation: 'R' })
+                : items[0];
+        })
+        .forEach(function (item) {
+            // If the interaction was removed, disable it in the DB.
+            // Otherwise find it and update or insert it
+            var _interaction = item.operation !== 'R'
+                ? Interactions.findOne({ id: item.obj.id })
+                : _.assign({}, item.obj, { isDisabled: true });
+
+            icwsDb.setInteraction(_interaction, true);
+        })
+        .value();
+
+    // Clear the changes for Interactions
+    Interactions.flushChanges();
 }
 
 /*********************
@@ -396,7 +437,7 @@ function queueSub(action, subId, workstations) {
     var _subPath = 'messaging/subscriptions/queues/:id'
         .replace(':id', subId)
 
-    console.log('Subscribing to {num} queue(s)!'.replace('{num}', _queueIds.length));
+    logger.log('Subscribing to new queues!', 'info', { queueCount: _queueIds.length });
 
     var _options = {
         queueIds: _queueIds,
