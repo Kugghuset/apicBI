@@ -7,7 +7,7 @@ var fs = require('fs');
 
 var relativeLogPath = '../.logs/';
 var sLogFileName = 'logfile.log';
-var logPath = path.resolve(__dirname, relativeLogPath, process.env.APP_NAME, 'logfile.log');
+var logPath = path.resolve(__dirname, relativeLogPath, process.env.APP_NAME);
 
 if (!fs.existsSync(path.dirname(logPath))) {
   fs.mkdirSync(path.dirname(logPath));
