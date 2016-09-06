@@ -70,7 +70,7 @@ function initTable(name, options) {
  * @return {Promise}
  */
 function init(context) {
-    return r.connect({ host: config.host, port: config.db_port })
+    return r.connect({ host: config.db_host, port: config.db_port, user: config.db_user, password: config.db_password })
     .then(function (connection) {
         _conn = connection;
 
