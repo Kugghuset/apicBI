@@ -16,6 +16,7 @@ var icwsPush = require('./icws.push');
 var icwsDb = require('./icws.db');
 
 var config = require('./../../configs/database');
+var logger = require('./../../middlehand/logger');
 
 /** @type {LokiCollection<{}>} */
 var Interactions = icwsStorage.getCollection('interactions');
@@ -163,7 +164,7 @@ function updateInteractions(data) {
             var _updated = Interactions.findOne({ id: _.toString(interaction.id) });
 
             if (_.isNull(_updated)) {
-                console.log('Failed to find interaction to update: ' + interaction.id);
+                logger.log('Failed to find interaction to update', 'info', { interactionId: interaction.id });
                 return;
             }
 
@@ -195,7 +196,7 @@ function updateInteractions(data) {
             var _updated = Interactions.findOne({ id: _.toString(removedId) });
 
             if (_.isNull(_updated)) {
-                console.log('Failed to remove interaction, could not find it: ' + removedId);
+                logger.log('Failed to remove interaction, could not find it', 'info', { interactionId: removedId });
                 return;
             }
 
@@ -244,7 +245,7 @@ function updateWorkstations(data) {
             .thru(function (workstations) { return workstations.concat(_added, _changed); })
             .value();
 
-        console.log('There are now {num} workstations!'.replace('{num}', __workstations.length));
+        logger.log('Workstations updated', 'info', { workstationCount: __workstations.length });
 
         // Get the ids to added workstations, if any, subscribe to their queues
         var _addedIds = _.map(_added, 'id');
@@ -328,7 +329,7 @@ function storeInteraction(interaction) {
         .then(function (data) { /** Do something? */ })
         .catch(function (err) {
             // Must be caught, otherwise it might break stuff.
-            console.log('Something went wrong when pushing to Power BI: ' + err.toString());
+            logger.log('Failed to push data to PowerBI', 'error', { error: _.isError(err) ? err.toString() : err });
         });
     }
 }
@@ -436,7 +437,7 @@ function queueSub(action, subId, workstations) {
     var _subPath = 'messaging/subscriptions/queues/:id'
         .replace(':id', subId)
 
-    console.log('Subscribing to {num} queue(s)!'.replace('{num}', _queueIds.length));
+    logger.log('Subscribing to new queues!', 'info', { queueCount: _queueIds.length });
 
     var _options = {
         queueIds: _queueIds,

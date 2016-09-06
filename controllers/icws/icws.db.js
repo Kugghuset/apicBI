@@ -5,6 +5,8 @@ var Promise = require('bluebird');
 
 var db = require('./../../middlehand/db');
 var models = require('./../../middlehand/models/models');
+var logger = require('./../../middlehand/logger');
+var utils = require('./icws.utils');
 
 var Interaction = models.models.Interaction;
 var Agent = models.models.Agent;
@@ -24,12 +26,13 @@ function setInteraction(interaction, silentFail) {
     return Interaction.filter({ id: id }).run(db.conn())
     .then(function (cursor) { return cursor.toArray() })
     .then(function (items) {
+        logger.log('Setting interaction', 'debug', { interactionId: id })
         return items && items.length
-            ? Interaction.get(items[0]._id).update(_interaction).run(db.conn())
+            ? Interaction.filter({ id: id }).update(_interaction).run(db.conn())
             : Interaction.insert(_interaction).run(db.conn());
     })
     .catch(function (err) {
-        console.log(err)
+        logger.log('Failed to set interaction', 'error', { error: err.toString(), interactionId: id });
 
         if (silentFail) {
             return;
@@ -56,12 +59,13 @@ function setAgent(agent, silentFail) {
     return Agent.filter({ id: id }).run(db.conn())
     .then(function (cursor) { return cursor.toArray(); })
     .then(function (items) {
+        logger.log('Setting agent', 'debug', { agentId: id })
         return items && items.length
-            ? Agent.get(items[0]._id).update(_agent).run(db.conn())
+            ? Agent.filter({ id: id }).update(_agent).run(db.conn())
             : Agent.insert(_agent).run(db.conn());
     })
     .catch(function (err) {
-        console.log(err);
+        logger.log('Failed to set agent', 'error', { error: err.toString(), agentId: id });
 
         if (silentFail) {
             return;
@@ -72,11 +76,24 @@ function setAgent(agent, silentFail) {
 }
 
 /**
+ * Sets all rows where isCurrent === true to isCurrent = false.
+ *
+ * @param {Table} coll
+ * @return {Promise}
+ */
+function resetIsCurrent(coll) {
+    return coll.filter({ isCurrent: true }).update({ isCurrent: false }).run(db.conn());
+}
+
+/**
  * Initializes the DB and models.
  */
 function init() {
     return db.init({ db: 'icws' })
-    .then(models.init);
+    .then(models.init)
+    .then(function () {
+        return utils.settle(_.map(models.models, resetIsCurrent));
+    });
 }
 
 module.exports = {

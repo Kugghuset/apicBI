@@ -14,6 +14,8 @@ var icwsPush = require('./icws/icws.push');
 var icwsDb = require('./icws/icws.db');
 var icwsUtils = require('./icws/icws.utils');
 
+var logger = require('./../middlehand/logger');
+
 /**
  * Polls the messaging route for new data
  * and handles new data for various endpoints.
@@ -33,8 +35,7 @@ function poll() {
         icwsInteraction.watch(dataArr);
     })
     .catch(function (err) {
-        console.log('The following error occured when polling: ' + err.toString());
-        console.log(err.stack)
+        logger.log('An error occured when polling', 'error', { error: err.toString(), stackTrace: err.stack });
     })
 }
 
@@ -69,10 +70,10 @@ function startPolling(ms) {
         : 1000;
 
     if (!_interval) {
-        console.log('Start polling ICWS server');
+        logger.log('Start polling ICWS server');
         _interval = setInterval(poll, ms)
     } else {
-        console.log('Polling already active.');
+        logger.log('Polling already active.');
     }
 
     return _interval;
@@ -86,10 +87,10 @@ function startPolling(ms) {
 function stopPolling() {
 
     if (_interval) {
-        console.log('Stop polling the ICWS server');
+        logger.log('Stop polling the ICWS server');
         clearInterval(_interval);
     } else {
-        console.log('Cannot stop polling, nothing to stop.');
+        logger.log('Cannot stop polling, nothing to stop.');
     }
 
     _interval = undefined;
@@ -149,8 +150,7 @@ function run() {
             resolve(icws);
         })
         .catch(function (err) {
-            console.log(err);
-            console.log(err.trace)
+            logger.log('Failed to properly run icws', 'error', { error: err.toString() });
             reject(err);
         })
 

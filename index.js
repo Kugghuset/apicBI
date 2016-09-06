@@ -55,7 +55,7 @@ if (config.icws_app_server) {
       var host = server.address().address;
       var port = server.address().port;
 
-      console.log('App listening on %s on port %s', host, port);
+      logger.log('App listening on ' + host + ' on port ' + port);
 
       icwsCtrl.run();
   });

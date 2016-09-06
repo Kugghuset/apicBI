@@ -10,6 +10,8 @@ var azure = require('./../../lib/azure');
 var icwsUtils = require('./icws.utils');
 var icwsStorage = require('./icws.storage');
 
+var logger = require('./../../middlehand/logger');
+
 var PushedPowerBi = icwsStorage.getCollection('pushedPowerBi');
 var config = require('./../../configs/database');
 
@@ -80,14 +82,14 @@ function pickData(item) {
  */
 function toPowerBi(data, powerBi, attempt) {
     if (_.isUndefined(attempt)) {
-        console.log('Pushing ICWS data.');
+        logger.log('Pushing ICWS data.', 'info');
         attempt = 0;
     } else {
-        console.log('Attempting to push ICWS data again. ' + attempt + ' attempt');
+        logger.log('Attempting to push ICWS data again', 'info', { attempts: attempt });
     }
 
     if (attempt >= 10) {
-        console.log('Too many failed attempts to push ICWS data to Power BI');
+        logger.log('Too many failed attempts to push ICWS data to Power BI', 'info', { attempts: attempt });
 
         PushedPowerBi.findAndUpdate(
             function (item) { return _.find(data.weekly, { id: item.id }); },
@@ -121,18 +123,18 @@ function toPowerBi(data, powerBi, attempt) {
             }
 
             if (!config.allow_push) {
-                console.log('Won\'t push. Would have pushed ICWS data to Power BI. icws_agent_' + key + ', ' + value.length + ' rows.');
+                logger.log('Won\'t push. Would have pushed ICWS data to Power BI.', 'info', { tableName: 'icws_agent_' + key, rowCoutn: value.length });
                 return Promise.resolve({});
             }
 
-            console.log('Pushing ICWS data to Power BI. icws_agent_' + key + ', ' + value.length + ' rows.');
+            utils.log('Pushing ICWS data to Power BI.', 'info', { tableName: 'icws_agent_' + key, rowCount: value.length });
             return powerBi.addRows(datasetId, 'icws_agent_' + key, _.map(value, pickData))
             .then(function (result) {
-                console.log('Sucessfully pushed ICWS data to Power BI. icws_agent_' + key);
+                utils.log('Sucessfully pushed ICWS data to Power BI.', { tableName: 'icws_agent_' + key, rowCount: value.length });
                 return Promise.resolve(result);
             })
             .catch(function (err) {
-                console.log('Failed to Push ICWS data for icws_agent' + key + ': ' + _.isError(err) ? err.toString() : JSON.stringify(err));
+                logger.log('Failed to Push ICWS data', 'error', { error: _.isError(err) ? err.toString() : JSON.stringify(err), tableName: 'icws_agent' + key });
                 return Promise.reject(err);
             });
         });
@@ -142,12 +144,12 @@ function toPowerBi(data, powerBi, attempt) {
     .then(function (values) {
         var _errors = _.filter(values, _.isError);
         if (_.some(_errors)) {
-            console.log('The following errors occured when pushing ICWS data: ' + _.map(_errors, _.toString).join(', '));
+            logger.log('Some errors occured when pushing ICWS data to PowerBI', 'info', { errors: _.map(_errors, _.toString).join(', ') });
         }
 
         // If there are only errors, it failed completely
         if (_errors.length === values.length) {
-            console.log('Failed to push any ICWS data to Power BI');
+            logger.log('Failed to push any ICWS data to Power BI', 'error');
             return Promise.reject(new Error('Failed to push ICWS data to Power BI'));
         }
 
@@ -159,7 +161,7 @@ function toPowerBi(data, powerBi, attempt) {
         return Promise.resolve(_.filter(values, function (value) { return !_.isError(value); }));
     })
     .catch(function (err) {
-        console.log('Failed to push ICWS data to Power BI: ' + err.toString());
+        logger.log('Failed to push ICWS data to Power BI', 'error', { error: err.toString() });
 
         return toPowerBi(data, powerBi, attempt += 1);
     });

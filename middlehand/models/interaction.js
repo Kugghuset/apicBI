@@ -40,7 +40,6 @@ function init() {
     return db.initTable('interaction', { primaryKey: '_id', })
     .then(function () {
         logger.log('Table initialized.', 'info', { name: 'interaction' });
-
         return Promise.resolve();
     })
     .catch(function (err) {

@@ -1,5 +1,9 @@
 'use strict'
 
+if (!process.env.APP_NAME) {
+    process.env.APP_NAME = 'utility';
+}
+
 var _ = require('lodash');
 var Promise = require('bluebird');
 var fs = require('fs');
@@ -7,13 +11,15 @@ var path = require('path');
 var moment = require('moment');
 var loki = require('lokijs');
 
+var logger = require('logger')
+
 var _dbPath = path.resolve(__dirname, './assets/icws-storage.json');
 
 var _isLoaded = false;
 
 // If there is no database file, create it
 if (!fs.existsSync(_dbPath)) {
-    console.log('Creating local storage for icws in memory database.');
+    logger.log('Creating local storage for icws in memory database.');
     fs.writeFileSync(_dbPath, '');
 }
 
@@ -21,9 +27,9 @@ var _storage = new loki(_dbPath, { autosave: true, autosaveInterval: 100, autolo
 
 function onLoaded(err) {
     if (err) {
-        console.log(err);
+        logger.log('Failed to load database from file', 'error', { error: err.toString()     });
     } else {
-        console.log('Database loaded');
+        logger.log('Database loaded');
 
         /** @type {LokiCollection<T>} */
         var PushedPowerBi = getCollection('pushedPowerBi');
@@ -31,8 +37,8 @@ function onLoaded(err) {
         PushedPowerBi.removeWhere(function () { return true; });
 
         _storage.saveDatabase(function (err) {
-            if (err) { console.log(err); }
-            console.log('PushedPowerBi cleaned, no data in db');
+            if (err) { logger.log('Failed to save database to file', 'error', { error: err.toString() }); }
+            logger.log('PushedPowerBi cleaned, no data in db');
 
             process.exit();
         });

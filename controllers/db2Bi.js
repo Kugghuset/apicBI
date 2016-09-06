@@ -1,3 +1,5 @@
+'use strict'
+
 var Promise = require('bluebird');
 var AzureAuth = require('../lib/azureAuth');
 var PowerBi = require('../lib/powerBi');
@@ -12,6 +14,7 @@ var stateHandler = require('./stateHandler');
 var azure = require('../lib/azure');
 var mail = require('../lib/mail');
 var config = require('./../configs/database');
+var logger = require('./../middlehand/logger');
 
 // Init only needed once
 sql.setDefaultConfig(database.ic);
@@ -69,8 +72,9 @@ function saveTimeStamp(filepath, latest) {
     // Save the timestamp for future use, if there is one
     if (latest && latest.TerminatedDateTimeGMT) {
         var timestamp = latest.TerminatedDateTimeGMT.getTime() + 5;
-        console.log('Writing new timestamp: ' + timestamp + ', which is: ' + moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS'));
-        stateHandler.writeJsonFile(filepath, { timestamp: timestamp, timeString: moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS') });
+        var _data = { timestamp: timestamp, timeString: moment(timestamp).format('YYYY-MM-DD HH:mm:ss.SSS') };
+        logger.log('Writing new timestamp', 'info',  _data);
+        stateHandler.writeJsonFile(filepath, _data);
         return true;
     }
     return false;
@@ -93,7 +97,7 @@ function pushData(data, datasetId, powerBi, attempt) {
             // Only save the timestamp if it's the first attempt.
             saveTimeStamp(filepath, data.latest);
         } else {
-            console.log('Skipping writing timestamp, attempt to send data: ' + attempt);
+            logger.log('Skip writing timestamp, attempting to send data', 'info', { attempt: attempt });
         }
 
         var promises = _.map({ day: data.todayOnly, week: data.recordset }, function (value, key) {
@@ -104,7 +108,7 @@ function pushData(data, datasetId, powerBi, attempt) {
 
                     // Table names will be be prefixed with 'day_' or 'week_'
                     powerBi.addRows(datasetId, [key, 'per_agent'].join('_'), value).then(function (result) {
-                        console.log([key, 'per_agent'].join('_') + ' sent ' + value.length + ' rows. ' + moment().format('YYYY-MM-DD HH:mm'));
+                        logger.log('Rows added to PowerBI', 'info', { tableName: [key, 'per_agent'].join('_'), rowCount: value.length });
                         resolve(result);
                     }).catch(reject);
 
@@ -166,7 +170,7 @@ function cleanDataset(recordset, lastUpdated) {
 
     // recordset will allways be the same or greater than todayOnly, so it's valid to only check it's length;
     if (recordset && recordset.length) {
-        console.log('New data found at: ' + moment().format('YYYY-MM-DD HH:mm') + '!');
+        logger.log('Found new data', 'info', { rowCoutn: recordset.length });
 
         // Resolve the various recordsets
         return { recordset: recordset, todayOnly: todayOnly, latest: latest };
@@ -174,53 +178,6 @@ function cleanDataset(recordset, lastUpdated) {
         // Resolve an empty object instead
         return {};
     }
-}
-
-/**
- * Notifies the admins about the errors which have occured.
- *
- * @return {promise}
- */
-function notifyErrors() {
-
-    // Emails are allowed to be sent with a minimum interval of 15 minutes
-    if (moment().subtract(15, 'minutes').isBefore(_lastMail)) {
-        console.log('Not sending email as there still is time in the mail buffer.');
-
-        // Return early as no mails should be sent yet.
-        return;
-    }
-
-    // Get all errors in a readable manner.
-    var errors = _.map(_errors, function (err) {
-        // Set *_err* either to the error or a stringified version of it.
-        var _err = (_.isError(err))
-            ? err
-            : _.attempt(function () { return JSON.stringify(err, null, 4); });
-
-        // Either if something went wrong when stringifying it, or if it's an empty object
-        // set _err to err again.
-        if (_err != err && (_.isError(err) || _.isEqual({}, err))) {
-            _err = err;
-        }
-
-        return _err;
-    });
-
-    // Empty the _errors array
-    _errors = [];
-    _lastMail = new Date();
-
-    return mail.send('Real time errors', [
-        'Hello, we could not push data to Power BI.',
-        'The following {num} errors have occured:'.replace('{num}', errors.length),
-        '',
-        errors.join('\n---\n'),
-        '',
-        'Best wishes,',
-        'The real time dashboard crew'
-    ].join('\n'));
-
 }
 
 /**
@@ -236,10 +193,7 @@ function read(data, attempt) {
 
     if (attempt >= 10) {
 
-        // Too many attempts!
-        notifyErrors();
-
-        return console.log('Failed too many times.');
+        return logger.log('Failed too many times.', 'error', { attempts: attempt });
     }
 
     var lastUpdated = stateHandler.getLastUpdated();
@@ -279,8 +233,7 @@ function read(data, attempt) {
         return pushData(data, datasetId, powerBi, attempt);
     })
     .catch(function (err) {
-        console.log('Pushing an error to the error buffer at {time}'.replace('{time}', moment().format('YYYY-MM-DD HH:mm')));
-        _errors.push(err);
+        logger.log('Failed to push data to PowerBI', 'error', { error: _.isError(err) ? err.toString() : err, attempts: attempt });
 
         // Retry
         return read(data, attempt += 1);

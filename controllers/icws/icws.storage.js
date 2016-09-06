@@ -11,22 +11,27 @@ var utils = require('./../../lib/utils');
 var icwsUtils = require('./icws.utils');
 var schedules = require('./icws.schedules');
 
+var logger = require('./../../middlehand/logger');
+
 var _dbPath = path.resolve(__dirname, '../../assets/icws-storage.json');
 var _isLoaded = false;
 
 // If there is no database file, create it
 if (!fs.existsSync(_dbPath)) {
-    console.log('Creating local storage for icws in memory database.');
+    logger.log('Creating local storage for icws in memory database.');
     fs.writeFileSync(_dbPath, '');
 }
 
 var _storage = new loki(_dbPath, { autosave: true, autosaveInterval: 100, autoloadCallback: onLoaded, autoload: true });
 
+/**
+ * @param {Error} [err]
+ */
 function onLoaded(err) {
     if (err) {
-        console.log(err);
+        logger.log('Failed to load in memory database.', 'error', { error: err.toString() });
     } else {
-        console.log('Database loaded automatically');
+        logger.log('Database loaded automatically');
         _isLoaded = true;
         setupWeekly();
         setupDaily();
@@ -84,13 +89,13 @@ function init() {
     return new Promise(function (resolve, reject) {
         // Check if it's loaded already
         if (_isLoaded) {
-            console.log('Database is already loaded')
+            logger.log('Database is already loaded')
             return resolve(_storage);
         }
 
         // If there is no database file, create it
         if (!fs.existsSync(_dbPath)) {
-            console.log('Creating local storage for icws in memory database.');
+            logger.log('Creating local storage for icws in memory database.', 'info', { path: _dbPath });
             fs.writeFileSync(_dbPath, '');
         }
 
@@ -98,11 +103,11 @@ function init() {
         // Load the db from disk.
         _storage.loadDatabase({}, function (err) {
             if (err) {
-                console.log('Something went wrong when setting up the database: ' + err.toString());
+                logger.log('Failed to set up in memory database', 'error', { error: err.toString() });
                 return reject(err);
             }
 
-            console.log('Database loaded manually');
+            logger.log('Database loaded manually');
 
             _isLoaded = true;
             setupWeekly();

@@ -9,6 +9,8 @@ var icwsData = require('./icws.data');
 var icwsUtils = require('./icws.utils');
 var icwsDb = require('./icws.db');
 
+var logger = require('./../../middlehand/logger');
+
 var config = require('./../../configs/database');
 
 /** @type {LokiCollection<T>} */
@@ -111,7 +113,7 @@ function updateUsers(data) {
             .thru(function (users) { return users.concat(_added, _changed); })
             .value();
 
-        console.log('There are now {num} users!'.replace('{num}', _users.length));
+        logger.log('Users updated', 'info', { userCount: _users.lengh });
 
         // Get the ids to added users and, if any, subscribe to their statuses
         var _addedIds = _.map(_added, 'id');
@@ -123,11 +125,13 @@ function updateUsers(data) {
         _.forEach(_added.concat(_changed), function (user) {
             var _agent = Agents.findOne({ id: _.toString(user.id) });
 
-            if (_agent) {
+            var _isUpdated = !icwsUtils.objectEquals(_agent, _.assign({}, _agent, user));
+
+            if (_agent && _isUpdated) {
                 // There's an existing user, update it
                 _agent = _.assign(_agent, user);
                 Agents.update(_agent);
-            } else {
+            } else if (!_agent) {
                 // Insert the new user!
                 Agents.insert(user);
             }
@@ -138,7 +142,7 @@ function updateUsers(data) {
             Agents.findAndUpdate(function (agent) {
                 return !!_.find(_removed, { configuration: { id: agent.id } });
             }, function (agent) {
-                return _.assign(agent, { isCurrent: true });
+                return _.assign(agent, { isCurrent: false });
             });
 
             userStatusSub('unsubscribe', _removed);
@@ -171,9 +175,7 @@ function updateStatuses(data) {
         var _user = _.find(_users, function (u) { return _.toString(u.id) === _.toString(user.id); });
 
         if (!_user) {
-            console.log('Failed to find user.')
-            console.log(JSON.stringify(user, null, 4));
-            console.log('\n\n\n')
+            utils.log('Failed to find user to update status', 'error', user);
         }
 
         // Find the persisted user
@@ -240,6 +242,9 @@ function pushChanges() {
             icwsDb.setAgent(_agent, true);
         })
         .value();
+
+    // Clear the changes
+    Agents.flushChanges();
 }
 
 /**
@@ -275,7 +280,7 @@ function userListSub(action, subId) {
     var path = 'messaging/subscriptions/configuration/users/:id'
         .replace(':id', subId);
 
-    console.log('Subscribing to the list of user in configurations/users');
+    logger.log('Subscribing to the list of user in configurations/users');
 
     return /unsub/i.test(action)
         ? icwsSub.unsubscribe(path)
@@ -307,7 +312,7 @@ function userStatusSub(action, users) {
 
     var subPath = 'messaging/subscriptions/status/user-statuses';
 
-    console.log('Subscribing to {num} users\' statuses.'.replace('{num}', users.length));
+    logger.log('Subscribing to users\' statuses.', 'info', { userCount: users.length });
 
     return /unsub/i.test(action)
         ? icwsSub.unsubscribe(subPath)

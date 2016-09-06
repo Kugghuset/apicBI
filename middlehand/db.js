@@ -89,6 +89,7 @@ function toArray(cursor) {
 }
 
 module.exports = {
+    r: r,
     conn: function () { return _conn; },
     setConnection: function (value) { _conn = value;  },
     initDb: initDb,
