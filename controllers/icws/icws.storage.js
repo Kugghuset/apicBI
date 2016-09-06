@@ -33,6 +33,7 @@ function onLoaded(err) {
     } else {
         logger.log('Database loaded automatically');
         _isLoaded = true;
+        schedules.setup();
         setupWeekly();
         setupDaily();
     }
@@ -110,6 +111,7 @@ function init() {
             logger.log('Database loaded manually');
 
             _isLoaded = true;
+            schedules.setup();
             setupWeekly();
             setupDaily();
 
