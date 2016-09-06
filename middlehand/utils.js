@@ -53,33 +53,37 @@ function setupItems(coll, query, conn) {
 /**
  * @param {{ id: String }[]} coll
  * @param {{ old_val: { id: String }, new_val: { id: String } }} update
+ * @param {String} [collName]
  */
-function setItem(coll, update) {
+function setItem(coll, update, collName) {
     // Get the values
     var _new = update.new_val;
     var _old = update.old_val;
 
     if (_.isNull(_old)) {
         coll.push(_new);
+        logger.log('Added item to collection', 'debug', { name: collName, id: _new.id, _id: _new._id });
     } else if (_.isNull(_new)) {
-        var _index = _.findIndex(coll, { id: _old.id });
+        var _index = _.findIndex(coll, { id: _old.id, _id: _old._id });
 
         if (_index < 0) {
-            logger.log('Failed to find item', 'info', { id: _old.id });
+            logger.log('Failed to find item', 'info', { id: _old.id, _id: _old._id });
             return;
         }
 
         coll.splice(_index, 1);
+        logger.log('Removed item from collection', 'debug', { name: collName, id: _old.id, _id: _old._id });
     } else {
-        var _index = _.findIndex(coll, { id: _new.id });
+        var _index = _.findIndex(coll, { id: _new.id, _id: _new._id });
 
         if (_index < 0) {
-            logger.log('Failed to find item', 'info', { id: _new.id });
+            logger.log('Failed to find item', 'info', { id: _new.id, _id: _new._id });
             coll.push(_new);
             return;
         }
 
         coll.splice(_index, 1, _new);
+        logger.log('Updated item in collection', 'debug', { name: collName, id: _new.id, _id: _new._id });
     }
 }
 

@@ -57,10 +57,10 @@ function listen() {
     .then(function (cursor) {
         cursor.each(function (err, update) {
             if (err) {
-                logger.log('Failed to get cursor for changes', 'error', { name: 'AvailableAgents', error: err.toString() });
+                logger.log('Failed to get update', 'error', { name: 'AvailableAgents', error: err.toString() });
                 _eventer.trigger('error', err);
             } else {
-                utils.setItem(__agents, update);
+                utils.setItem(__agents, update, 'availeble agents');
                 _eventer.trigger('updated', __agents);
                 updateAgentStats();
             }

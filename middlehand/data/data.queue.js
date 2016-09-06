@@ -40,11 +40,11 @@ function listen() {
     .then(function (cursor) {
         cursor.each(function (err, update) {
             if (err) {
-                logger.log('Failed to get cursor for changes', 'error', { name: 'CurrentQueue', error: err.toString() });
+                logger.log('Failed to get update', 'error', { name: 'CurrentQueue', error: err.toString() });
                 _eventer.trigger('error', err);
             } else {
                 // Update the queue
-                utils.setItem(__queue, update);
+                utils.setItem(__queue, update, 'current queue');
                 _eventer.trigger('updated', __queue);
                 updateQueueStats();
             }

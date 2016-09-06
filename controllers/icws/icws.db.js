@@ -20,8 +20,6 @@ function setInteraction(interaction, silentFail) {
     // Get the interaction without Loki.js attributes
     var _interaction = _.omit(interaction, [ '$loki', 'meta' ]);
 
-    // console.log('Setting interaction ' + _interaction.id);
-
     // Try to find the interaction
     return Interaction.filter({ id: id }).run(db.conn())
     .then(function (cursor) { return cursor.toArray() })
