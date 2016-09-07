@@ -183,17 +183,24 @@ function cleanDataset(recordset, lastUpdated) {
 /**
  * Reads the DB and pushes the data to Power BI.
  *
+ * @param {function} onCompleted Callback function with error parameter
  * @param {object} data Set recursevly, DO NOT SET!
  * @param {number} attempt Set recursevly, DO NOT SET!
  */
-function read(data, attempt) {
+function read(onCompleted, data, attempt) {
 
     // Setup for possible recursion
     if (_.isUndefined(attempt)) { attempt = 0; }
 
     if (attempt >= 10) {
+        logger.log('Failed too many times.', 'error', { attempts: attempt });
 
-        return logger.log('Failed too many times.', 'error', { attempts: attempt });
+        var err = new Error('Failed too many times');
+        if (_.isFunction(onCompleted)) {
+            onCompleted(err);
+        }
+
+        return;
     }
 
     var lastUpdated = stateHandler.getLastUpdated();
@@ -232,11 +239,16 @@ function read(data, attempt) {
         // Push the data
         return pushData(data, datasetId, powerBi, attempt);
     })
+    .then(function () {
+        if (_.isFunction(onCompleted)) {
+            onCompleted()
+        }
+    })
     .catch(function (err) {
         logger.log('Failed to push data to PowerBI', 'error', { error: _.isError(err) ? err.toString() : err, attempts: attempt });
 
         // Retry
-        return read(data, attempt += 1);
+        return read(onCompleted, data, attempt += 1);
     });
 };
 

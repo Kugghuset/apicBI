@@ -25,11 +25,22 @@ var everyStartOfWeek = later.parse.recur()
     .on(2).dayOfWeek()
     .first().hour();
 
-logger.log('Running schedules, waiting for updates...');
-// Regular update
-later.setInterval(DB2BI.read, every10Seconds);
+/**
+ * @param {error|object} [err]
+ */
+function runSchedule(err) {
+    if (err) {
+        logger.log('Failed to start schedules', 'error', { error: _.isError(err) ? err.toString() : err });
+        return;
+    }
+
+    logger.log('Running schedules, waiting for updates...');
+    // Regular update
+    later.setInterval(DB2BI.read, every10Seconds);
+}
+
 // Instantly call the read method
-DB2BI.read();
+DB2BI.read(runSchedule);
 
 /**
  * Outcommented because Power BI cannot add tables to existing datasets.
