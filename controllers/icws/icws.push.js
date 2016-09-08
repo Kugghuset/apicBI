@@ -127,10 +127,10 @@ function toPowerBi(data, powerBi, attempt) {
                 return Promise.resolve({});
             }
 
-            utils.log('Pushing ICWS data to Power BI.', 'info', { tableName: 'icws_agent_' + key, rowCount: value.length });
+            logger.log('Pushing ICWS data to Power BI.', 'info', { tableName: 'icws_agent_' + key, rowCount: value.length });
             return powerBi.addRows(datasetId, 'icws_agent_' + key, _.map(value, pickData))
             .then(function (result) {
-                utils.log('Sucessfully pushed ICWS data to Power BI.', { tableName: 'icws_agent_' + key, rowCount: value.length });
+                logger.log('Sucessfully pushed ICWS data to Power BI.', { tableName: 'icws_agent_' + key, rowCount: value.length });
                 return Promise.resolve(result);
             })
             .catch(function (err) {
