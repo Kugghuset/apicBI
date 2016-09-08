@@ -238,12 +238,13 @@ function getDebug() {
  * @param {Element} el
  */
 function initFlowtype(el) {
-    flowtype(el, {
-        minWidth: '230px',
-        maxWidth: '800px',
-        min: 36,
-        max: 70,
-    });
+    /** Disabled for now */
+    // flowtype(el, {
+    //     minWidth: '230px',
+    //     maxWidth: '800px',
+    //     min: 60,
+    //     max: 70,
+    // });
 }
 
 module.exports = {
