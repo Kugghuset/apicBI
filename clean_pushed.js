@@ -11,7 +11,7 @@ var path = require('path');
 var moment = require('moment');
 var loki = require('lokijs');
 
-var logger = require('logger')
+var logger = require('./middlehand/logger');
 
 var _dbPath = path.resolve(__dirname, './assets/icws-storage.json');
 
