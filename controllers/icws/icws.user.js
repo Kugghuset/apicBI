@@ -128,10 +128,24 @@ function updateUsers(data) {
             var _isUpdated = !icwsUtils.objectEquals(_agent, _.assign({}, _agent, user));
 
             if (_agent && _isUpdated) {
+                var _meta = _.assign({}, { agentId: user.id }, _.pick(user, ['isAvailalble', 'isAvailableCsa', 'isAvailablePartnerService']));
+                if (!_agent.isAvailable && user.isAvailable) {
+                    logger.log('Agent ' + user.name + ' became available', 'info', _meta);
+                } else if (_agent.isAvailable && !user.isAvailable) {
+                    logger.log('Agent ' + user.name + ' became unavailable', 'info', _meta);
+                }
+
                 // There's an existing user, update it
                 _agent = _.assign(_agent, user);
                 Agents.update(_agent);
             } else if (!_agent) {
+
+                var _meta = _.assign({}, { agentId: user.id }, _.pick(user, ['isAvailalble', 'isAvailableCsa', 'isAvailablePartnerService']));
+                if (user.isAvailable) {
+                    logger.log('Agent ' + user.name + ' became available', 'info', _meta);
+                } else if (!user.isAvailable) {
+                    logger.log('Agent ' + user.name + ' became unavailable', 'info', _meta);
+                }
                 // Insert the new user!
                 Agents.insert(user);
             }
