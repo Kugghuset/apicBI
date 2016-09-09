@@ -61,5 +61,6 @@ if (config.icws_app_server) {
   });
 
 } else {
+  logger.log('ICWS app starting.', 'info');
   icwsCtrl.run();
 }
