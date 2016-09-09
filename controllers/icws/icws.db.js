@@ -26,7 +26,7 @@ function setInteraction(interaction, silentFail) {
     return Interaction.filter({ id: id }).run(db.conn())
     .then(function (cursor) { return cursor.toArray() })
     .then(function (items) {
-        logger.log('Setting interaction', 'debug', { interactionId: id })
+        logger.log('Setting interaction', 'verbose', { interactionId: id })
         return items && items.length
             ? Interaction.filter({ id: id }).update(_interaction).run(db.conn())
             : Interaction.insert(_interaction).run(db.conn());
@@ -59,7 +59,7 @@ function setAgent(agent, silentFail) {
     return Agent.filter({ id: id }).run(db.conn())
     .then(function (cursor) { return cursor.toArray(); })
     .then(function (items) {
-        logger.log('Setting agent', 'debug', { agentId: id })
+        logger.log('Setting agent', 'verbose', { agentId: id })
         return items && items.length
             ? Agent.filter({ id: id }).update(_agent).run(db.conn())
             : Agent.insert(_agent).run(db.conn());

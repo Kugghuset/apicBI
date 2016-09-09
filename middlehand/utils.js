@@ -62,7 +62,7 @@ function setItem(coll, update, collName) {
 
     if (_.isNull(_old)) {
         coll.push(_new);
-        logger.log('Added item to collection', 'debug', { name: collName, id: _new.id, _id: _new._id });
+        logger.log('Added item to collection', 'verbose', { name: collName, id: _new.id, _id: _new._id });
     } else if (_.isNull(_new)) {
         var _index = _.findIndex(coll, { id: _old.id, _id: _old._id });
 
@@ -72,7 +72,7 @@ function setItem(coll, update, collName) {
         }
 
         coll.splice(_index, 1);
-        logger.log('Removed item from collection', 'debug', { name: collName, id: _old.id, _id: _old._id });
+        logger.log('Removed item from collection', 'verbose', { name: collName, id: _old.id, _id: _old._id });
     } else {
         var _index = _.findIndex(coll, { id: _new.id, _id: _new._id });
 
@@ -83,7 +83,7 @@ function setItem(coll, update, collName) {
         }
 
         coll.splice(_index, 1, _new);
-        logger.log('Updated item in collection', 'debug', { name: collName, id: _new.id, _id: _new._id });
+        logger.log('Updated item in collection', 'verbose', { name: collName, id: _new.id, _id: _new._id });
     }
 }
 
