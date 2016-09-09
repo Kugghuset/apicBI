@@ -18,13 +18,13 @@ if (!fs.existsSync(path.dirname(logPath))) {
 var logger = new winston.Logger({
     transports: [
         new winston.transports.Console({
-            level: 'debug',
+            level: 'verbose',
             json: false,
             colorize: true,
             timestamp: true,
         }),
         new winston.transports.File({
-            level: 'debug',
+            level: 'verbose',
             name: 'logfile',
             filename: logPath,
             maxsize: 5242880, // 5 MB
