@@ -7,6 +7,7 @@ var path = require('path');
 var moment = require('moment');
 var loki = require('lokijs');
 
+var ClearTable = require('./../clearTable');
 var utils = require('./../../lib/utils');
 var icwsUtils = require('./icws.utils');
 var schedules = require('./icws.schedules');
@@ -33,6 +34,7 @@ function onLoaded(err) {
     } else {
         logger.log('Database loaded automatically');
         _isLoaded = true;
+
         schedules.setup();
         setupWeekly();
         setupDaily();
