@@ -189,7 +189,7 @@ function updateStatuses(data) {
         var _user = _.find(_users, function (u) { return _.toString(u.id) === _.toString(user.id); });
 
         if (!_user) {
-            utils.log('Failed to find user to update status', 'error', user);
+            logger.log('Failed to find user to update status', 'error', user);
         }
 
         // Find the persisted user
