@@ -139,8 +139,8 @@ function updateUsers(data) {
                 _agent = _.assign(_agent, user);
                 Agents.update(_agent);
             } else if (!_agent) {
-
                 var _meta = _.assign({}, { agentId: user.id }, _.pick(user, ['isAvailalble', 'isAvailableCsa', 'isAvailablePartnerService']));
+
                 if (user.isAvailable) {
                     logger.log('Agent ' + user.name + ' became available', 'info', _meta);
                 } else if (!user.isAvailable) {
@@ -174,13 +174,17 @@ function updateUsers(data) {
 function updateStatuses(data) {
     // Get the changes
     var _statUsers = _.map(data.userStatusList, function (user) {
-      return {
-          id: user.userId,
-          statusName: user.statusId,
-          loggedIn: user.loggedIn,
-          onPhone: user.onPhone,
-          stations: user.stations,
-      }
+
+        logger.log(JSON.stringify(user), 'verbose');
+
+        return {
+            id: user.userId,
+            statusName: user.statusId,
+            loggedIn: user.loggedIn,
+            onPhone: user.onPhone,
+            stations: user.stations,
+            isCurrent: true,
+        }
     });
 
     // Update all users
