@@ -80,12 +80,12 @@ function updateUsers(data) {
                 statusName: _.get(user, 'statusText'),
                 lastLocalChange: new Date(),
                 workgroups: _.map(_.get(user, 'workgroups'), function (wg) { return { id: wg.id, name: wg.displayName } }),
-                loggedIn: null,
-                onPhone: null,
+                loggedIn: false,
+                onPhone: false,
                 isCurrent: true,
                 switches: {
-                    loggedIn: null,
-                    onPhone: null,
+                    loggedIn: false,
+                    onPhone: false,
                 },
             }
         })
@@ -103,12 +103,12 @@ function updateUsers(data) {
                 statusName: _.get(user, 'statusText'),
                 lastLocalChange: new Date(),
                 workgroups: _.map(_.get(user, 'workgroups'), function (wg) { return { id: wg.id, name: wg.displayName } }),
-                loggedIn: null,
-                onPhone: null,
+                loggedIn: false,
+                onPhone: false,
                 isCurrent: true,
                 switches: {
-                    loggedIn: null,
-                    onPhone: null,
+                    loggedIn: false,
+                    onPhone: false,
                 },
             };
         })
