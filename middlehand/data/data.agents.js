@@ -159,16 +159,16 @@ function hasWorkgroups(agent, workgroups) {
 /**
  * Returns true or false for whether the agent is considered available or not.
  *
- * @param {{ loggedIn: Boolean, onPhone: Boolean, statusName: String, workgroups: { name: String }[] }} agent
+ * @param {{ loggedIn: Boolean, onPhone: Boolean, switches: { loggedIn: Boolean, onPhone: Boolean, }, statusName: String, workgroups: { name: String }[] }} agent
  * @param {String[]|String} workgroups
  * @return {Boolean}
  */
 function isAvailable(agent, workgroups) {
     return _.every([
         // Must be logged in
-        agent.loggedIn,
+        _.some([agent.loggedIn, _.get(agent, 'switches.loggedIn')]),
         // Must not be on the phone
-        !agent.onPhone,
+        !_.some([agent.onPhone, _.get(agent, 'switches.onPhone')]),
         // The status must be 'Available'
         agent.statusName === 'Available',
         // Filter out any incorrect workgroups

@@ -8,7 +8,7 @@ var logger = require('./../logger');
 var Agent = db.table('agent');
 
 /**
- * @type {{ id: String, name: String, statusName: String, lastLocalChange: Date, workgroups: { id: String, name: String }[], isAvailableCsa: Boolean, isAvailablePartnerService: Boolean, loggedIn: Boolean, onPhone: Boolean, stations: String[], isCurrent: Boolean }}
+ * @type {{ id: String, name: String, statusName: String, lastLocalChange: Date, workgroups: { id: String, name: String }[], isAvailableCsa: Boolean, isAvailablePartnerService: Boolean, loggedIn: Boolean, onPhone: Boolean, switches: { onPhone: Boolean, loggedIn: Boolean, isCurrent: Boolean }, stations: String[], isCurrent: Boolean }}
  */
 var __agent = null;
 
@@ -27,6 +27,11 @@ var schema = {
     isAvailablePartnerService: Boolean,
     loggedIn: Boolean,
     onPhone: Boolean,
+    switches: {
+        onPhone: Boolean,
+        loggedIn: Boolean,
+        isCurrent: Boolean,
+    },
     stations: [
         String,
     ],

@@ -9,8 +9,6 @@ var relativeLogPath = '../.logs';
 var sLogFileName = 'logfile.log';
 var logPath = path.resolve(__dirname, relativeLogPath, process.env.APP_NAME, sLogFileName);
 
-console.log(fs.existsSync(path.dirname(logPath)))
-
 if (!fs.existsSync(path.dirname(logPath))) {
   fs.mkdirSync(path.dirname(logPath));
 }
