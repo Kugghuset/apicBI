@@ -174,9 +174,6 @@ function updateUsers(data) {
 function updateStatuses(data) {
     // Get the changes
     var _statUsers = _.map(data.userStatusList, function (user) {
-
-        logger.log(JSON.stringify(user), 'verbose');
-
         return {
             id: user.userId,
             statusName: user.statusId,
