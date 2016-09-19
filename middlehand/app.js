@@ -32,12 +32,6 @@ require('./routes')(app);
 var models = require('./models/models');
 var data = require('./data/index');
 
-var Interaction = models.models.Interaction;
-
-var _interactions = [];
-
-var _queue = [];
-
 db.init({ db: 'icws' })
 .then(models.init)
 .then(function () {

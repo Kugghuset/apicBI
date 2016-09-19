@@ -232,7 +232,13 @@ function updateStatuses(data) {
 
         var _updated = _.assign({}, user, _updated);
 
-        var _isUpdated = !icwsUtils.objectEquals(_agent, _.assign({}, _agent, _updated));
+        /**
+         * Always set to true as this doesn't seem to work properly
+         * in production (on agents only).
+         *
+         * It works on interactions and as expected in dev.
+         */
+        var _isUpdated = true; // !icwsUtils.objectEquals(_agent, _.assign({}, _agent, _updated));
 
         // If there is a user and a persisted user.
         if (_agent && _isUpdated) {
