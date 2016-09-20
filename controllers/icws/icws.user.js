@@ -206,10 +206,13 @@ function updateStatuses(data) {
     // Update all users
     _.forEach(_statUsers, function (user) {
         // Find the user to update
-        var _user = _.find(_users, function (u) { return _.toString(u.id) === _.toString(user.id); });
+        var _user = _.find(_users, function (u) { return _.toString(u.id) == _.toString(user.id); });
 
         if (!_user) {
-            logger.log('Failed to find user to update status', 'error', user);
+            logger.log('Failed to find user to update status, assuming user instead', 'error', user);
+
+            // assume user
+            _user = _.assign({}, user, { workgroups: [] });
         }
 
         // Find the persisted user
@@ -238,7 +241,7 @@ function updateStatuses(data) {
          *
          * It works on interactions and as expected in dev.
          */
-        var _isUpdated = true; // !icwsUtils.objectEquals(_agent, _.assign({}, _agent, _updated));
+        var _isUpdated = true;
 
         // If there is a user and a persisted user.
         if (_agent && _isUpdated) {
