@@ -9,6 +9,7 @@ module.exports = {
     entry: {
         'available-agents': './available-agents/available-agents.component',
         'current-queue': './current-queue/current-queue.component',
+        'default': './default/default.component',
     },
     output: {
         path: path.join(__dirname, '/middlehand/www/.bin'),

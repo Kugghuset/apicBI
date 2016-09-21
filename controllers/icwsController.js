@@ -23,16 +23,25 @@ var logger = require('./../middlehand/logger');
  * @return void
  */
 function poll() {
-    icws.get('messaging/messages')
+    icws.get('messaging/messages', null, false, true)
     .then(function (res) {
+
+        if (res.response.statusCode >= 400) {
+            logger.log('An erroneous statusCode gotten when polling.', 'info', { statusCode: res.response.statusCode, statusMessage: res.response.statusMessage });
+            stopPolling();
+
+            // Restart the app and return
+            logger.log('Attempting to reconnect.', 'info');
+            return run();
+        }
 
         var dataArr = !!res.body
             ? res.body
             : res;
 
-        // Watch for, and handles changes regarding users
-        icwsUser.watch(dataArr);
+        // Watch for, and handles changes for interactions users
         icwsInteraction.watch(dataArr);
+        icwsUser.watch(dataArr);
     })
     .catch(function (err) {
         logger.log('An error occured when polling', 'error', { error: err.toString(), stackTrace: err.stack });
@@ -53,8 +62,7 @@ function poll() {
 function setupSubscriptions() {
     var promises = [ icwsUser.setup(), icwsInteraction.setup(), icwsPush.setup(), ];
 
-    return icwsDb.init()
-    .then(function () { return icwsUtils.settle(promises); });
+    return icwsUtils.settle(promises);
 }
 
 /**
@@ -141,6 +149,7 @@ function run() {
               ]
           })
         })
+        .then(icwsDb.init)
         .then(setupSubscriptions)
         .then(function () { return Promise.resolve(icwsData.setup()); })
         .then(function (data) {
@@ -152,8 +161,7 @@ function run() {
         .catch(function (err) {
             logger.log('Failed to properly run icws', 'error', { error: err.toString() });
             reject(err);
-        })
-
+        });
     });
 }
 
