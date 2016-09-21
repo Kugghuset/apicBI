@@ -65,14 +65,17 @@ function isAuthenticated(req, res, next) {
 
         // If there is no appKey, return 401
         if (_.isNull(_appKey)) {
+            logger.log('Failed to authenticate request', 'info', { reason: 'Missing token' });
             res.status(401).send('Unauthorized');
         }
 
         return validateKey(_appKey)
         .then(function (isValid) {
             if (isValid) {
+                logger.log('Sucessfully authenticated request', 'info', { appKey: _appKey });
                 next();
             } else {
+                logger.log('Failed to authenticate request', 'info', { reason: 'Invalid token' });
                 res.status(401).send('Unauthorized');
             }
         });
