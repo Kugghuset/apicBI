@@ -157,7 +157,7 @@ function _request(method, url, data, options, dataOnly) {
         }))
         .then(
             function (resp) { resolve(!!dataOnly ? resp.data : resp) },
-            function (err) { reject(new Error(`${err.status}: ${err.statusText}`)) }
+            function (err) { reject(new Error(err.status + ': ' +err.statusText)) }
         );
     });
 }
