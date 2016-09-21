@@ -120,14 +120,14 @@ function updateUsers(data) {
         // Update users if there's been a change
         _users = _.chain(_users)
             // Filter out any removed users
-            .filter(function (user) { return !!~_removed.indexOf(user.id); })
+            .filter(function (user) { return !~_removed.indexOf(user.id); })
             // Filter out any modified users, as to not have duplicate entries
             .filter(function (user) { return !_.find(_changed, { id: user.id }) })
             // Get the complete list of users
             .thru(function (users) { return users.concat(_added, _changed); })
             .value();
 
-        logger.log('Users updated', 'info', { userCount: _users.lengh });
+        logger.log('Users updated', 'info', { userCount: _users.length });
 
         // Get the ids to added users and, if any, subscribe to their statuses
         var _addedIds = _.map(_added, 'id');
