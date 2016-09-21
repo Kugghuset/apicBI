@@ -17,5 +17,6 @@ module.exports = {
         id: process.env.PUSHER_ID || -1,
         secret: process.env.PUSHER_SECRET || '',
         cluster: process.env.PUSHER_CLUSTER || -1,
-    }
+    },
+    app_secret: process.env.APP_SECRET || 'sshhh',
 }

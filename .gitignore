@@ -51,5 +51,6 @@ icws_auth.*
 tsd.json
 assets/icws
 assets/icws-storage.json
+assets/auth-keys.json
 rethinkdb_data/
 .bin

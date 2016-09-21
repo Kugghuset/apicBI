@@ -14,9 +14,23 @@ require('./../../../lib/flowtype');
 function flowtype (el, opts) {
     return $(el).flowtype(opts);
 }
+
 window.Pusher = Pusher;
 
 var config = require('./config');
+
+/**
+ * @type {{ t: String, wg: String, st: String, debug: Boolean }}
+ */
+var _query = _.chain(window.location.search.substr(1))
+    .thru(function (query) { return query.split('&'); })
+    .map(function (item) { return item.split('='); })
+    .map(function (arr) { return { key: decodeURIComponent(arr[0]), value: decodeURIComponent(arr[1]) } })
+    .thru(function (items) { return _.reduce(items, function (obj, item, i) { return _.assign({}, obj, _.set({}, item.key, item.value)); }, {}); })
+    .value();
+
+/** @type {String} */
+var _token = _query.t;
 
 Vue.filter('date', function (val, format) {
   return !!val
@@ -138,7 +152,7 @@ function _request(method, url, data, options, dataOnly) {
         Vue.http(_.assign({}, options, {
             method: method,
             data: data,
-            url: url,
+            url: url + (/\?/.test(url) ? '&' : '?') + 't=' + _token,
             headers: headers,
         }))
         .then(

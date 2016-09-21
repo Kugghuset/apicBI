@@ -11,6 +11,8 @@ var utils = require('./../utils');
 var dataQueue = require('./data.queue');
 var dataAgents = require('./data.agents');
 
+var auth = require('../services/auth');
+
 var Pusher = require('pusher');
 
 var pusher = new Pusher({
@@ -36,8 +38,6 @@ function init() {
         pusher.trigger('dev', 'queue-stats', stats);
     })
 }
-
-
 
 module.exports = {
     init: init,

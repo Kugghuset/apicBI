@@ -62,9 +62,3 @@ and state files are deleted.
 ```bash
 npm run clean && npm run reinit && npm run clear_session
 ```
-
-### `npm run serve`
-Runs the server in a forever instance, which will restart when crashed.
-```bash
-forever -c node server.js
-```
