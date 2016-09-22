@@ -10,6 +10,9 @@ var utils = require('./icws.utils');
 
 var Interaction = models.models.Interaction;
 var Agent = models.models.Agent;
+var Log = models.models.Log;
+
+var _storesLogs = false;
 
 /**
  * @param {{ id: String }} interaction
@@ -39,8 +42,7 @@ function setInteraction(interaction, silentFail) {
         } else {
             return Promise.reject(err);
         }
-
-    })
+    });
 }
 
 /**
@@ -86,13 +88,35 @@ function resetIsCurrent(coll) {
 }
 
 /**
+ * Sets the logger to push log data to RethinkDB.
+ */
+function storeLogs() {
+    // If it's listeneing already, don't do anything
+    if (_storesLogs) {
+        return;
+    }
+
+    // Set _storesLogs to true, as to not listen to the same event multiple times
+    _storesLogs = true;
+
+    logger.logger.stream({ start: -1 }).on('log', function (log) {
+        Log.insert(log).run(db.conn())
+        .then(function (data) { /** Do something? */ })
+        .catch(function (err) { /** Handle error */ });
+    });
+
+    _storesLogs = true;
+}
+
+/**
  * Initializes the DB and models.
  */
 function init() {
     return db.init({ db: 'icws' })
     .then(models.init)
     .then(function () {
-        return utils.settle(_.map(models.models, resetIsCurrent));
+        storeLogs();
+        return utils.settle(_.map(_.omit(models.models, 'Log'), resetIsCurrent));
     });
 }
 

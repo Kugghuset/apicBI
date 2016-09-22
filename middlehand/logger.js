@@ -31,7 +31,6 @@ var logger = new winston.Logger({
     exitOnError: true
 });
 
-
 /**
  * @param {String} message
  * @param {String} [level='info']

@@ -5,10 +5,12 @@ var utils = require('./../utils');
 
 var Agent = require('./agent');
 var Interaction = require('./interaction');
+var Log = require('./log');
 
 var __models = {
     Agent: Agent,
     Interaction: Interaction,
+    Log: Log,
 };
 
 /**
