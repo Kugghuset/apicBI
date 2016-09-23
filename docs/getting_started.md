@@ -18,7 +18,7 @@ Versioning and cloud storage of the code is done using Git, meaning it's highly 
 
 The external database used for communicating between the ICWS Api consumer and middlehand app is RethinkDB. Follow instructions for your platform for proper installation. Make sure you can run it using the terminal. (For deployment, it should be run as a service, though)
 
-### Cloning and
+### Before running the apps
 
 To clone the repo, simply navigate to the folder you want to be the parent of the project and use `git clone <repo web URL>`.
 
@@ -46,5 +46,3 @@ cd apicBI
 # Install dependencies
 npm install
 ```
-
-
