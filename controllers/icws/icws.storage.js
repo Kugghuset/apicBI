@@ -23,23 +23,14 @@ if (!fs.existsSync(_dbPath)) {
     fs.writeFileSync(_dbPath, '');
 }
 
-var _storage = new loki(_dbPath, { autosave: true, autosaveInterval: 100, autoloadCallback: onLoaded, autoload: true });
-
 /**
- * @param {Error} [err]
+ * Load the stored data from the previously stored data.
  */
-function onLoaded(err) {
-    if (err) {
-        logger.log('Failed to load in memory database.', 'error', { error: err.toString() });
-    } else {
-        logger.log('Database loaded automatically');
-        _isLoaded = true;
-
-        schedules.setup();
-        setupWeekly();
-        setupDaily();
-    }
-}
+var _storage = new loki(_dbPath, {
+    autosave: true,
+    autosaveInterval: 60000,
+    autoload: false,
+});
 
 /**
  * Sets up all weekly events for collections.
@@ -101,7 +92,6 @@ function init() {
             logger.log('Creating local storage for icws in memory database.', 'info', { path: _dbPath });
             fs.writeFileSync(_dbPath, '');
         }
-
 
         // Load the db from disk.
         _storage.loadDatabase({}, function (err) {
